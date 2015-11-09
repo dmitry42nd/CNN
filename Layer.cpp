@@ -3,24 +3,31 @@
 #include <fstream>
 #include <iostream>
 
+Neuron::Neuron(const cl::Context & context, const cl::Device & device, const cl::CommandQueue & commandQueue) :
+  context(context),
+  device(device),
+  commandQueue(commandQueue) {
+}
+
 const vector<Mat> &Neuron::getFeatureMaps() {
   return featureMaps;
 }
 
-CNeuron::CNeuron(float *kernelData, int kernelWidth, const cl::Context &context, const cl::Device &device, const cl::CommandQueue &commandQueue) :
+void Neuron::setFeatureMap(vector<Mat> featureMaps) {
+  Neuron::featureMaps = featureMaps;
+}
+
+
+CNeuron::CNeuron(float *kernelData, int kernelWidth, const cl::Context &context, const cl::Device &device, const cl::CommandQueue &commandQueue) : 
+  Neuron(context, device, commandQueue),
   kernelWidth(kernelWidth),
-  kernelHeight(kernelWidth),
-  context(context),
-  device(device),
-  commandQueue(commandQueue) {
+  kernelHeight(kernelWidth){
   setKernel(kernelData, kernelWidth);
   init();
 }
 
 CNeuron::CNeuron(const cl::Context &context, const cl::Device &device, const cl::CommandQueue &commandQueue) :
-  context(context),
-  device(device),
-  commandQueue(commandQueue) {
+  Neuron(context, device, commandQueue) {
   init();
 }
 
@@ -53,12 +60,12 @@ int CNeuron::init() {
   return 0;
 }
 
-int CNeuron::convolve(const cl::Buffer *inImgBuf, int inImgWidth, int inImgHeight) {
+int CNeuron::convolve(const shared_ptr<cl::Buffer> inImgBuf, int inImgWidth, int inImgHeight) {
   int convImgWidth = inImgWidth - (kernelWidth - 1);
   int convImgHeight = inImgHeight - (kernelHeight - 1);
   cl::Buffer convImgBuf = cl::Buffer(context, CL_MEM_WRITE_ONLY, sizeof(cl_uchar) * 3 * convImgWidth * convImgHeight, (void *)NULL);
 
-  kernel.setArg(0, sizeof(cl_mem), (void*)inImgBuf);
+  kernel.setArg(0, sizeof(cl_mem), (void*)inImgBuf.get());
   kernel.setArg(1, sizeof(cl_int), &kernelWidth);
   kernel.setArg(2, sizeof(cl_int), &kernelHeight);
   kernel.setArg(3, sizeof(cl_mem), (void*)&kernelBuf);
@@ -81,18 +88,15 @@ void CNeuron::setKernel(float *kernelData, int kernelWidth) {
 }
 
 
-PNeuron::PNeuron(const cl::Context & context, const cl::Device & device, const cl::CommandQueue & commandQueue) :
-  context(context),
-  device(device),
-  commandQueue(commandQueue) {
+
+PNeuron::PNeuron(float poolCoef, const cl::Context & context, const cl::Device & device, const cl::CommandQueue & commandQueue) :
+  Neuron(context, device, commandQueue),
+  poolCoef(poolCoef) {
   init();
 }
 
-PNeuron::PNeuron(float poolCoef, const cl::Context & context, const cl::Device & device, const cl::CommandQueue & commandQueue) :
-  poolCoef(poolCoef),
-  context(context),
-  device(device),
-  commandQueue(commandQueue) {
+PNeuron::PNeuron(const cl::Context & context, const cl::Device & device, const cl::CommandQueue & commandQueue) :
+  Neuron(context, device, commandQueue) {
   init();
 }
 
@@ -155,24 +159,29 @@ void PNeuron::setPoolCoef(float poolCoef) {
 
 
 template<typename NeuronType>
+Layer<NeuronType>::~Layer()
+{
+}
+
+template<typename NeuronType>
 Layer<NeuronType>::Layer() { }
 
 template<typename NeuronType>
-void Layer<NeuronType>::activate(Layer<NeuronType> * prevLayer_) {
+void Layer<NeuronType>::activate(vector<shared_ptr<Neuron>> prevNeurons, const cl::Context &context) {
   cout << "Virtual activate hidden layer function called\n";
 }
 
 template<typename NeuronType>
-shared_ptr<vector<NeuronType>> Layer<NeuronType>::getNeurons() {
-  return neurons;
+vector<shared_ptr<NeuronType>> Layer<NeuronType>::getNeurons() {
+  return vector<shared_ptr<NeuronType>>(neurons);
 }
 
 template<typename NeuronType>
-void Layer<NeuronType>::setNeurons(shared_ptr<vector<NeuronType>> neurons) {
+void Layer<NeuronType>::setNeurons(vector<shared_ptr<NeuronType>> neurons) {
   Layer::neurons = neurons;
 }
 
-ILayer::ILayer(char* path_) {
+ILayer::ILayer(char* path_) : Layer<Neuron>() {
   /*
   Mat frame = imread("input.png", CV_LOAD_IMAGE_COLOR);
   Mat img;
@@ -180,30 +189,35 @@ ILayer::ILayer(char* path_) {
   */
 }
 
-void ILayer::activate(Layer<Neuron> *prevLayer_) {
+void ILayer::activate(vector<shared_ptr<Neuron>> prevNeurons, const cl::Context &context) {
   printf("ILayer done\n");
 }
 
-shared_ptr<vector<Neuron>> ILayer::getNeurons() {
-  return neurons;
-}
+OLayer::OLayer() : Layer<Neuron>() {}
 
-OLayer::OLayer() {}
-
-void OLayer::activate(Layer<Neuron> *prevLayer_) {
+void OLayer::activate(vector<shared_ptr<Neuron>> prevNeurons, const cl::Context &context) {
   printf("OLayer done\n");
 }
 
-shared_ptr<vector<Neuron>> OLayer::getNeurons() {
-  return neurons;
-}
-
-CLayer::CLayer(shared_ptr<vector<CNeuron>> neurons) {
+CLayer::CLayer(vector<shared_ptr<CNeuron>> neurons) : Layer<CNeuron>() {
   setNeurons(neurons);
 }
 
-void CLayer::activate(Layer *prevLayer_) {
-  //shared_ptr<vector<Neuron>> prevNeurons = prevLayer_->getNeurons();
+void CLayer::activate(vector<shared_ptr<Neuron>> prevNeurons, const cl::Context &context) {
+
+  for (int j = 0; j < prevNeurons.size(); j++) {
+    const vector<Mat> &prevFmaps = prevNeurons[0].get()->getFeatureMaps();
+    for (int k = 0; k < prevFmaps.size(); k++) {
+      int inImgWidth = prevFmaps[k].size().width;
+      int inImgHeight = prevFmaps[k].size().height;
+      
+      shared_ptr<cl::Buffer> inImgBuf = make_shared<cl::Buffer>(context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, sizeof(cl_uchar) * 3 * inImgWidth * inImgHeight, (void*)prevFmaps[k].data);
+      for (int i = 0; i < neurons.size(); i++) {
+        neurons[i].get()->convolve(inImgBuf, inImgWidth, inImgHeight);
+      }
+    }
+  }
+
   //const vector<Neuron> &neurons = prevLayer_->getNeurons();
   /*
   foreach neurons {
@@ -217,17 +231,13 @@ void CLayer::activate(Layer *prevLayer_) {
   cout << "CLayer done\n";
 }
 
-shared_ptr<vector<CNeuron>> CLayer::getNeurons() {
-  return neurons;
-}
-
-PLayer::PLayer(shared_ptr<vector<PNeuron>> neurons) {
+PLayer::PLayer(vector<shared_ptr<PNeuron>> neurons) : Layer<PNeuron>() {
   setNeurons(neurons);
 }
 
 void
-PLayer::activate(Layer *prevLayer_) {
-  //printf("SLayer done\n");
+PLayer::activate(vector<shared_ptr<Neuron>> prevNeurons, const cl::Context &context) {
+  //printf("PLayer done\n");
   /*
   foreach neurons {
   foreach prevNeurons {
@@ -237,8 +247,4 @@ PLayer::activate(Layer *prevLayer_) {
   }
   }
   */
-}
-
-shared_ptr<vector<PNeuron>> PLayer::getNeurons() {
-  return neurons;
 }

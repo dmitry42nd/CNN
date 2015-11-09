@@ -97,24 +97,34 @@ int main(int argc, char** argv)
   
   CNeuron cneuron(context, device, commandQueue);
   cneuron.setKernel(kernelData, kernelWidth);
-  vector<CNeuron> cNeurons;
+  vector<shared_ptr<CNeuron>> cNeurons;
 
-  cNeurons.push_back(cneuron);
-  CLayer cLayer(make_shared<vector<CNeuron>>(cNeurons));
-  (*cLayer.getNeurons().get())[0].convolve(&inImgBuf2, inImgWidth2, inImgHeight2);
-  (*cLayer.getNeurons().get())[0].convolve(&inImgBuf, inImgWidth, inImgHeight);
+  cNeurons.push_back(make_shared<CNeuron>(cneuron));
+  CLayer cLayer(cNeurons);
+  
+  
+  vector<Mat> fmaps;
+  fmaps.push_back(inImage);
+  fmaps.push_back(inImage2);
+  CNeuron cn0(context, device, commandQueue);
+  cn0.Neuron::setFeatureMap(fmaps);
+  
+  vector<shared_ptr<Neuron>> cns0;
+  cns0.push_back(make_shared<Neuron>(cn0));
+  cLayer.activate(cns0, context);
+  
 
-  //cneuron.convolve(&inImgBuf2, inImgWidth2, inImgHeight2);
-  //cneuron.convolve(&inImgBuf, inImgWidth, inImgHeight);
-
-  const vector<Mat> &cmaps = (*cLayer.getNeurons().get())[0].getFeatureMaps();
-
+  //cLayer.getNeurons()[0].get()->convolve(make_shared<cl::Buffer>(inImgBuf2), inImgWidth2, inImgHeight2);
+  //cLayer.getNeurons()[0].get()->convolve(make_shared<cl::Buffer>(inImgBuf), inImgWidth, inImgHeight);
+  
+  const vector<Mat> &cmaps = cLayer.getNeurons()[0].get()->getFeatureMaps();
+  
   inImgWidth = cmaps[0].size().width;
   inImgHeight = cmaps[0].size().height;
 
   inImgWidth2 = cmaps[1].size().width;
   inImgHeight2 = cmaps[1].size().height;
-
+  
   inImgBuf  = cl::Buffer(context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, sizeof(cl_uchar) * 3 * inImgWidth * inImgHeight, (void*)cmaps[0].data);
   inImgBuf2 = cl::Buffer(context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, sizeof(cl_uchar) * 3 * inImgWidth2 * inImgHeight2, (void*)cmaps[1].data);
   
