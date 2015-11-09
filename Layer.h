@@ -2,6 +2,7 @@
 #define __CL_ENABLE_EXCEPTIONS
 
 #include <vector>
+#include <memory>
 #include <opencv\highgui.h>
 #include <CL\cl.hpp>
 
@@ -12,14 +13,13 @@ class Neuron {
 protected:
   vector<Mat> featureMaps;
 public:
-  const vector<Mat> &getFeatureMaps() const;
+  const vector<Mat> &getFeatureMaps();
 };
 
-class ÑNeuron : public Neuron {
+class CNeuron : public Neuron {
 private:
   const string clConvFileName = "ConvOperation.cl";
 
-  float     *kernelData;
   int        kernelWidth;
   int        kernelHeight;
 
@@ -37,8 +37,8 @@ private:
   
   int init();
 public:
-  ÑNeuron(float *kernelData, int kernelWidth, const cl::Context &context, const cl::Device &device, const cl::CommandQueue &commandQueue);
-  ÑNeuron(const cl::Context &context, const cl::Device &device, const cl::CommandQueue &commandQueue);
+  CNeuron(float *kernelData, int kernelWidth, const cl::Context &context, const cl::Device &device, const cl::CommandQueue &commandQueue);
+  CNeuron(const cl::Context &context, const cl::Device &device, const cl::CommandQueue &commandQueue);
 
   int convolve(const cl::Buffer *inImgBuf, int inImgWidth, int inImgHeight);
   void setKernel(float *kernel, int width);
@@ -73,37 +73,42 @@ public:
 
 
 
+template<typename NeuronType>
 class Layer {
 protected:
-  vector<Neuron> *neurons;
+    shared_ptr<vector<NeuronType>> neurons;
 public:
   Layer();
-  Layer(vector<Neuron> *neurons);
   virtual void activate(Layer *prevLayer_);
-  vector<Neuron>* getNeurons();
+  shared_ptr<vector<NeuronType>> getNeurons();
+  void setNeurons(shared_ptr<vector<NeuronType>> neurons);
 };
 
-class ILayer : public Layer {
+class ILayer : public Layer<Neuron> {
 public:
   ILayer(char* path_);
   void activate(Layer * prevLayer_) override;
+  shared_ptr<vector<Neuron>> getNeurons();
 };
 
-class CLayer : public Layer {
-//private:
-public:
-  CLayer(vector<Neuron> *neurons);
-  void activate(Layer * prevLayer_) override;
-};
-
-class PLayer : public Layer {
-public:
-  PLayer(vector<Neuron> *neurons);
-  void activate(Layer * prevLayer_) override;
-};
-
-class OLayer : public Layer {
+class OLayer : public Layer<Neuron> {
 public:
   OLayer();
   void activate(Layer * prevLayer_) override;
+  shared_ptr<vector<Neuron>> getNeurons();
+};
+
+
+class CLayer : public Layer<CNeuron> {
+public:
+  CLayer(shared_ptr<vector<CNeuron>> neurons);
+  void activate(Layer * prevLayer_) override;
+  shared_ptr<vector<CNeuron>> getNeurons();
+};
+
+class PLayer : public Layer<PNeuron> {
+public:
+  PLayer(shared_ptr<vector<PNeuron>> neurons);
+  void activate(Layer * prevLayer_) override;
+  shared_ptr<vector<PNeuron>> getNeurons();
 };

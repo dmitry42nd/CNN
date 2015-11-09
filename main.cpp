@@ -82,7 +82,7 @@ int main(int argc, char** argv)
   int inImgHeight2 = inImage2.size().height;
     
   cl::Platform::get(&setPlatforms);
-  platformId = 0;
+  platformId = 0; //or 1 for Dima K.
   platform = setPlatforms[platformId];
 
   platform.getDevices(CL_DEVICE_TYPE_ALL, &setDevices);
@@ -91,20 +91,27 @@ int main(int argc, char** argv)
   
   commandQueue = cl::CommandQueue(context, device);
 
-  cl::Buffer inImgBuf = cl::Buffer(context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, sizeof(cl_uchar) * 3 * inImgWidth * inImgHeight, (void*)inImage.data);
+  cl::Buffer inImgBuf  = cl::Buffer(context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, sizeof(cl_uchar) * 3 * inImgWidth * inImgHeight, (void*)inImage.data);
   cl::Buffer inImgBuf2 = cl::Buffer(context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, sizeof(cl_uchar) * 3 * inImgWidth2 * inImgHeight2, (void*)inImage2.data);
   //< common stuff
   
-  ÑNeuron cneuron(context, device, commandQueue);
+  CNeuron cneuron(context, device, commandQueue);
   cneuron.setKernel(kernelData, kernelWidth);
-  cneuron.convolve(&inImgBuf2, inImgWidth2, inImgHeight2);
-  cneuron.convolve(&inImgBuf, inImgWidth, inImgHeight);
-  
-  vector<Mat> cmaps = cneuron.getFeatureMaps();
-  
+  vector<CNeuron> cNeurons;
+
+  cNeurons.push_back(cneuron);
+  CLayer cLayer(make_shared<vector<CNeuron>>(cNeurons));
+  (*cLayer.getNeurons().get())[0].convolve(&inImgBuf2, inImgWidth2, inImgHeight2);
+  (*cLayer.getNeurons().get())[0].convolve(&inImgBuf, inImgWidth, inImgHeight);
+
+  //cneuron.convolve(&inImgBuf2, inImgWidth2, inImgHeight2);
+  //cneuron.convolve(&inImgBuf, inImgWidth, inImgHeight);
+
+  const vector<Mat> &cmaps = (*cLayer.getNeurons().get())[0].getFeatureMaps();
+
   inImgWidth = cmaps[0].size().width;
   inImgHeight = cmaps[0].size().height;
-  
+
   inImgWidth2 = cmaps[1].size().width;
   inImgHeight2 = cmaps[1].size().height;
 
@@ -115,16 +122,15 @@ int main(int argc, char** argv)
   pneuron.setPoolCoef(poolCoef);
   pneuron.pool(&inImgBuf2, inImgWidth2, inImgHeight2);
   pneuron.pool(&inImgBuf, inImgWidth, inImgHeight);
-  
-  vector<Mat> maps = pneuron.getFeatureMaps();
+
+  const vector<Mat> &maps = pneuron.getFeatureMaps();
   char* x = new char[32];
   for (int i = 0; i < maps.size(); i++) {
-  sprintf(x, "output%d.png", i);
-  imwrite(x, maps[i]);
+    sprintf(x, "output%d.png", i);
+    imwrite(x, maps[i]);
   }
   delete[] x;
   
-
   cout << "done!\n";
   return 0;
 }
