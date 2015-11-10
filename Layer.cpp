@@ -9,6 +9,7 @@ Neuron::Neuron(const cl::Context & context, const cl::Device & device, const cl:
   commandQueue(commandQueue) {
 }
 
+
 CNeuron::CNeuron(float *kernelData, int kernelWidth, const cl::Context &context, const cl::Device &device, const cl::CommandQueue &commandQueue) : 
   Neuron(context, device, commandQueue),
   kernelWidth(kernelWidth),
@@ -81,7 +82,6 @@ void CNeuron::setKernel(float *kernelData, int kernelWidth) {
 }
 
 
-
 PNeuron::PNeuron(float poolCoef, const cl::Context & context, const cl::Device & device, const cl::CommandQueue & commandQueue) :
   Neuron(context, device, commandQueue),
   poolCoef(poolCoef) {
@@ -137,8 +137,6 @@ mBuffer PNeuron::pool(const mBuffer inImgBuf)
   commandQueue.enqueueNDRangeKernel(kernel, cl::NDRange(2), cl::NDRange(poolImgWidth, poolImgHeight), cl::NullRange);
   commandQueue.finish();
 
-  //Mat poolImage = Mat::zeros(Size(poolImgWidth, poolImgHeight), CV_8UC3);
-  //commandQueue.enqueueReadBuffer(poolImgBuf, CL_TRUE, 0, sizeof(cl_uchar) * 3 * poolImgWidth * poolImgHeight, poolImage.data);
   mBuffer res;
   res.data = make_shared<cl::Buffer>(poolImgBuf);
   res.width = poolImgWidth;
@@ -150,8 +148,6 @@ mBuffer PNeuron::pool(const mBuffer inImgBuf)
 void PNeuron::setPoolCoef(float poolCoef) {
   PNeuron::poolCoef = poolCoef;
 }
-
-
 
 
 
@@ -185,20 +181,23 @@ void OLayer::activate(vector<mBuffer> prevFeatureMaps, const cl::Context & conte
 
 
 CLayer::CLayer(vector<shared_ptr<CNeuron>> neurons) :
-  neurons (neurons) { }
+  neurons(neurons) { }
 
 void CLayer::activate(vector<mBuffer> prevFeatureMaps, const cl::Context &context) {
-
   for (int j = 0; j < prevFeatureMaps.size(); j++) {
     for (int i = 0; i < neurons.size(); i++) {
       featureMaps.push_back(neurons[i].get()->convolve(prevFeatureMaps[j]));
     }
   }
-
-  //cout << "CLayer done\n";
+  //cout << "CLayer done" << endl;
 }
 
-PLayer::PLayer(PNeuron neurons) :
-  neurons(neurons) { }
 
-void PLayer::activate(vector<mBuffer> prevFeatureMaps, const cl::Context & context) { }
+PLayer::PLayer(shared_ptr<PNeuron> neuron) :
+  neuron(neuron) { }
+
+void PLayer::activate(vector<mBuffer> prevFeatureMaps, const cl::Context & context) { 
+  for (int j = 0; j < prevFeatureMaps.size(); j++) {
+    featureMaps.push_back(neuron.get()->pool(prevFeatureMaps[j]));
+  }
+}

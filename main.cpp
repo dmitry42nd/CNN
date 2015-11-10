@@ -101,23 +101,34 @@ int main(int argc, char** argv)
   cl::Buffer inImgBuf  = cl::Buffer(context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, sizeof(cl_uchar) * 3 * inImgWidth * inImgHeight, (void*)inImage.data);
   cl::Buffer inImgBuf2 = cl::Buffer(context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, sizeof(cl_uchar) * 3 * inImgWidth2 * inImgHeight2, (void*)inImage2.data);
   //< common stuff
-  
+
+//Input Layer
   ILayer iLayer(inImage);
-  
+
+//Convolution Layer
   CNeuron cn0(kernelData, kernelWidth, context, device, commandQueue);
   CNeuron cn1(kernelData2, kernelWidth, context, device, commandQueue);
 
   vector<shared_ptr<CNeuron>> cns;
   cns.push_back(make_shared<CNeuron>(cn0));
   cns.push_back(make_shared<CNeuron>(cn1));
-  CLayer cLayer(cns);
-  
-  iLayer.activate(context);
-#if 1
-  cLayer.activate(iLayer.getFetureMaps(), context);
+  shared_ptr<CLayer> cLayer;// = make_shared<CLayer>(cns);
+//Pool Layer
+  PNeuron pn0(poolCoef, context, device, commandQueue);
+  shared_ptr<PLayer> pLayer;// = make_shared<PLayer>(make_shared<PNeuron>(pn0));
 
+  iLayer.activate(context);
+  cLayer = make_shared<CLayer>(cns);
+  cLayer->activate(iLayer.getFetureMaps(), context);
+
+  pLayer = make_shared<PLayer>(make_shared<PNeuron>(pn0));
+  pLayer->activate(cLayer->getFetureMaps(), context);
+
+  cLayer = make_shared<CLayer>(cns);
+  cLayer->activate(pLayer->getFetureMaps(), context);
+  
   char* x = new char[32];
-  vector<mBuffer> out = cLayer.getFetureMaps();
+  vector<mBuffer> out = cLayer->getFetureMaps();
   for (int i = 0; i < out.size(); i++) {
     mBuffer o = out[i];
     Mat image = Mat::zeros(Size(o.width, o.height), CV_8UC3);
@@ -126,7 +137,7 @@ int main(int argc, char** argv)
     imwrite(x, image);
   }
   delete[] x;
-#endif
+
   cout << "done!\n";
   return 0;
 }

@@ -105,8 +105,8 @@ public:
 
 class PLayer : public Layer {
 protected:
-  PNeuron neurons;
+  shared_ptr<PNeuron> neuron;
 public:
-  PLayer(PNeuron neurons);
+  PLayer(shared_ptr<PNeuron> neuron);
   void activate(vector<mBuffer> prevFeatureMaps, const cl::Context &context) override;
 };
