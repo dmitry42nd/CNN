@@ -62,17 +62,15 @@ int main(int argc, char** argv)
   float poolCoef = 0.5;
   kernelWidth = 5; kernelHeight = 5;
   kernelData = new float[kernelWidth * kernelHeight];
-  for (int i = 0; i < kernelWidth; ++i)
-  {
+  for (int i = 0; i < kernelWidth; ++i) {
     for (int j = 0; j < kernelHeight; ++j)
       kernelData[i + kernelWidth * j] = 0.1f;
   }
   
   float *kernelData2 = new float[kernelWidth * kernelHeight];
-  for (int i = 0; i < kernelWidth; ++i)
-  {
+  for (int i = 0; i < kernelWidth; ++i) {
     for (int j = 0; j < kernelHeight; ++j)
-      kernelData2[i + kernelWidth * j] = 0.4f;
+      kernelData2[i + kernelWidth * j] = 0.1f;
   }
 
   //common stuff >
@@ -119,16 +117,18 @@ int main(int argc, char** argv)
 
   iLayer.activate(context);
   cLayer = make_shared<CLayer>(cns);
-  cLayer->activate(iLayer.getFetureMaps(), context);
+  cLayer->activate(iLayer.getFeatureMaps(), context);
 
   pLayer = make_shared<PLayer>(make_shared<PNeuron>(pn0));
-  pLayer->activate(cLayer->getFetureMaps(), context);
+  pLayer->activate(cLayer->getFeatureMaps(), context);
 
   cLayer = make_shared<CLayer>(cns);
-  cLayer->activate(pLayer->getFetureMaps(), context);
+  cLayer->activate(pLayer->getFeatureMaps(), context);
+  
+  cLayer->activate(cLayer->getFeatureMaps(), context);
   
   char* x = new char[32];
-  vector<mBuffer> out = cLayer->getFetureMaps();
+  vector<mBuffer> out = cLayer->getFeatureMaps();
   for (int i = 0; i < out.size(); i++) {
     mBuffer o = out[i];
     Mat image = Mat::zeros(Size(o.width, o.height), CV_8UC3);

@@ -53,8 +53,8 @@ int CNeuron::init() {
 }
 
 mBuffer CNeuron::convolve(const mBuffer inImgBuf) {
-  int convImgWidth = inImgBuf.width - (kernelWidth - 1);
-  int convImgHeight = inImgBuf.height - (kernelHeight - 1);
+  int convImgWidth  = inImgBuf.width;
+  int convImgHeight = inImgBuf.height;
   cl::Buffer convImgBuf = cl::Buffer(context, CL_MEM_ALLOC_HOST_PTR, sizeof(cl_uchar) * 3 * convImgWidth * convImgHeight, (void *)NULL);
 
   kernel.setArg(0, sizeof(cl_mem), (void*)inImgBuf.data.get());
@@ -62,10 +62,10 @@ mBuffer CNeuron::convolve(const mBuffer inImgBuf) {
   kernel.setArg(2, sizeof(cl_int), &kernelHeight);
   kernel.setArg(3, sizeof(cl_mem), (void*)&kernelBuf);
   kernel.setArg(4, sizeof(cl_mem), (void*)&convImgBuf);
-
+  
   commandQueue.enqueueNDRangeKernel(kernel, cl::NDRange(2), cl::NDRange(convImgWidth, convImgHeight), cl::NullRange);
   commandQueue.finish();
-
+  
   mBuffer res = {
     make_shared<cl::Buffer>(convImgBuf),
     convImgWidth,

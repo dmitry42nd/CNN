@@ -78,7 +78,7 @@ public:
   virtual ~Layer();
   Layer();
   virtual void activate(vector<mBuffer> prevFeatureMaps, const cl::Context &context);
-  vector<mBuffer> getFetureMaps () { return featureMaps; };
+  vector<mBuffer> getFeatureMaps () { return featureMaps; };
 };
 
 class ILayer : public Layer {
