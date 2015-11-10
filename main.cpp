@@ -74,7 +74,7 @@ int main(int argc, char** argv)
   }
 
   //common stuff >
-  Mat inImage = imread("input.png");
+  Mat inImage = imread("input2.png");
   Mat inImage2 = imread("input2.png");
   if (inImage.empty() || inImage2.empty()) {
     cout << "Image is empty" << endl;
@@ -125,6 +125,9 @@ int main(int argc, char** argv)
   cLayer = make_shared<CLayer>(cns);
   cLayer->activate(pLayer->getFeatureMaps(), context);
   
+  cLayer->activate(cLayer->getFeatureMaps(), context);
+  cLayer->activate(cLayer->getFeatureMaps(), context);
+  cLayer->activate(cLayer->getFeatureMaps(), context);
   cLayer->activate(cLayer->getFeatureMaps(), context);
   
   char* x = new char[32];
