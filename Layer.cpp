@@ -9,19 +9,10 @@ Neuron::Neuron(const cl::Context & context, const cl::Device & device, const cl:
   commandQueue(commandQueue) {
 }
 
-const vector<Mat> &Neuron::getFeatureMaps() {
-  return featureMaps;
-}
-
-void Neuron::setFeatureMap(vector<Mat> featureMaps) {
-  Neuron::featureMaps = featureMaps;
-}
-
-
 CNeuron::CNeuron(float *kernelData, int kernelWidth, const cl::Context &context, const cl::Device &device, const cl::CommandQueue &commandQueue) : 
   Neuron(context, device, commandQueue),
   kernelWidth(kernelWidth),
-  kernelHeight(kernelWidth){
+  kernelHeight(kernelWidth) {
   setKernel(kernelData, kernelWidth);
   init();
 }
@@ -60,12 +51,12 @@ int CNeuron::init() {
   return 0;
 }
 
-int CNeuron::convolve(const shared_ptr<cl::Buffer> inImgBuf, int inImgWidth, int inImgHeight) {
-  int convImgWidth = inImgWidth - (kernelWidth - 1);
-  int convImgHeight = inImgHeight - (kernelHeight - 1);
-  cl::Buffer convImgBuf = cl::Buffer(context, CL_MEM_WRITE_ONLY, sizeof(cl_uchar) * 3 * convImgWidth * convImgHeight, (void *)NULL);
+mBuffer CNeuron::convolve(const mBuffer inImgBuf) {
+  int convImgWidth = inImgBuf.width - (kernelWidth - 1);
+  int convImgHeight = inImgBuf.height - (kernelHeight - 1);
+  cl::Buffer convImgBuf = cl::Buffer(context, CL_MEM_ALLOC_HOST_PTR, sizeof(cl_uchar) * 3 * convImgWidth * convImgHeight, (void *)NULL);
 
-  kernel.setArg(0, sizeof(cl_mem), (void*)inImgBuf.get());
+  kernel.setArg(0, sizeof(cl_mem), (void*)inImgBuf.data.get());
   kernel.setArg(1, sizeof(cl_int), &kernelWidth);
   kernel.setArg(2, sizeof(cl_int), &kernelHeight);
   kernel.setArg(3, sizeof(cl_mem), (void*)&kernelBuf);
@@ -74,11 +65,13 @@ int CNeuron::convolve(const shared_ptr<cl::Buffer> inImgBuf, int inImgWidth, int
   commandQueue.enqueueNDRangeKernel(kernel, cl::NDRange(2), cl::NDRange(convImgWidth, convImgHeight), cl::NullRange);
   commandQueue.finish();
 
-  Mat convImage = Mat::zeros(Size(convImgWidth, convImgHeight), CV_8UC3);
-  commandQueue.enqueueReadBuffer(convImgBuf, CL_TRUE, 0, sizeof(cl_uchar) * 3 * convImgWidth * convImgHeight, convImage.data);
-  featureMaps.push_back(convImage);
+  mBuffer res = {
+    make_shared<cl::Buffer>(convImgBuf),
+    convImgWidth,
+    convImgHeight
+  };
 
-  return 0;
+  return res;
 }
 
 void CNeuron::setKernel(float *kernelData, int kernelWidth) {
@@ -130,24 +123,28 @@ int PNeuron::init() {
   return 0;
 }
 
-int PNeuron::pool(const cl::Buffer * inImgBuf, int inImgWidth, int inImgHeight)
-{
-  int poolImgWidth = int(poolCoef * inImgWidth);
-  int poolImgHeight = int(poolCoef * inImgHeight);
-  cl::Buffer poolImgBuf = cl::Buffer(context, CL_MEM_WRITE_ONLY, sizeof(cl_uchar) * 3 * poolImgWidth * poolImgHeight, NULL);
 
-  kernel.setArg(0, sizeof(cl_mem), (void*)inImgBuf);
+mBuffer PNeuron::pool(const mBuffer inImgBuf)
+{
+  int poolImgWidth = int(poolCoef * inImgBuf.width);
+  int poolImgHeight = int(poolCoef * inImgBuf.height);
+  cl::Buffer poolImgBuf = cl::Buffer(context, CL_MEM_ALLOC_HOST_PTR, sizeof(cl_uchar) * 3 * poolImgWidth * poolImgHeight, NULL);
+
+  kernel.setArg(0, sizeof(cl_mem), (void*)inImgBuf.data.get());
   kernel.setArg(1, sizeof(cl_float), &poolCoef);
   kernel.setArg(2, sizeof(cl_mem), (void*)&poolImgBuf);
 
   commandQueue.enqueueNDRangeKernel(kernel, cl::NDRange(2), cl::NDRange(poolImgWidth, poolImgHeight), cl::NullRange);
   commandQueue.finish();
 
-  Mat poolImage = Mat::zeros(Size(poolImgWidth, poolImgHeight), CV_8UC3);
-  commandQueue.enqueueReadBuffer(poolImgBuf, CL_TRUE, 0, sizeof(cl_uchar) * 3 * poolImgWidth * poolImgHeight, poolImage.data);
-  featureMaps.push_back(poolImage);
+  //Mat poolImage = Mat::zeros(Size(poolImgWidth, poolImgHeight), CV_8UC3);
+  //commandQueue.enqueueReadBuffer(poolImgBuf, CL_TRUE, 0, sizeof(cl_uchar) * 3 * poolImgWidth * poolImgHeight, poolImage.data);
+  mBuffer res;
+  res.data = make_shared<cl::Buffer>(poolImgBuf);
+  res.width = poolImgWidth;
+  res.height = poolImgHeight;
 
-  return 0;
+  return res;
 }
 
 void PNeuron::setPoolCoef(float poolCoef) {
@@ -158,93 +155,50 @@ void PNeuron::setPoolCoef(float poolCoef) {
 
 
 
-template<typename NeuronType>
-Layer<NeuronType>::~Layer()
+Layer::~Layer() { }
+
+Layer::Layer() { }
+
+void Layer::activate(vector<mBuffer> prevFeatureMaps, const cl::Context & context)
 {
-}
-
-template<typename NeuronType>
-Layer<NeuronType>::Layer() { }
-
-template<typename NeuronType>
-void Layer<NeuronType>::activate(vector<shared_ptr<Neuron>> prevNeurons, const cl::Context &context) {
   cout << "Virtual activate hidden layer function called\n";
 }
 
-template<typename NeuronType>
-vector<shared_ptr<NeuronType>> Layer<NeuronType>::getNeurons() {
-  return vector<shared_ptr<NeuronType>>(neurons);
+
+ILayer::ILayer(Mat inImage) :
+  inImage(inImage) { }
+
+void ILayer::activate(const cl::Context & context) {
+  mBuffer image {
+    make_shared<cl::Buffer>(cl::Buffer(context, CL_MEM_USE_HOST_PTR, sizeof(cl_uchar) * 3 * inImage.size().width * inImage.size().height, inImage.data)),
+    inImage.size().width,
+    inImage.size().height 
+  };
+
+  featureMaps.push_back(image);
 }
 
-template<typename NeuronType>
-void Layer<NeuronType>::setNeurons(vector<shared_ptr<NeuronType>> neurons) {
-  Layer::neurons = neurons;
-}
+  
+OLayer::OLayer() : Layer() {}
 
-ILayer::ILayer(char* path_) : Layer<Neuron>() {
-  /*
-  Mat frame = imread("input.png", CV_LOAD_IMAGE_COLOR);
-  Mat img;
-  cvtColor(frame, img, COLOR_BGR2GRAY);
-  */
-}
+void OLayer::activate(vector<mBuffer> prevFeatureMaps, const cl::Context & context) { }
 
-void ILayer::activate(vector<shared_ptr<Neuron>> prevNeurons, const cl::Context &context) {
-  printf("ILayer done\n");
-}
 
-OLayer::OLayer() : Layer<Neuron>() {}
+CLayer::CLayer(vector<shared_ptr<CNeuron>> neurons) :
+  neurons (neurons) { }
 
-void OLayer::activate(vector<shared_ptr<Neuron>> prevNeurons, const cl::Context &context) {
-  printf("OLayer done\n");
-}
+void CLayer::activate(vector<mBuffer> prevFeatureMaps, const cl::Context &context) {
 
-CLayer::CLayer(vector<shared_ptr<CNeuron>> neurons) : Layer<CNeuron>() {
-  setNeurons(neurons);
-}
-
-void CLayer::activate(vector<shared_ptr<Neuron>> prevNeurons, const cl::Context &context) {
-
-  for (int j = 0; j < prevNeurons.size(); j++) {
-    const vector<Mat> &prevFmaps = prevNeurons[0].get()->getFeatureMaps();
-    for (int k = 0; k < prevFmaps.size(); k++) {
-      int inImgWidth = prevFmaps[k].size().width;
-      int inImgHeight = prevFmaps[k].size().height;
-      
-      shared_ptr<cl::Buffer> inImgBuf = make_shared<cl::Buffer>(context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, sizeof(cl_uchar) * 3 * inImgWidth * inImgHeight, (void*)prevFmaps[k].data);
-      for (int i = 0; i < neurons.size(); i++) {
-        neurons[i].get()->convolve(inImgBuf, inImgWidth, inImgHeight);
-      }
+  for (int j = 0; j < prevFeatureMaps.size(); j++) {
+    for (int i = 0; i < neurons.size(); i++) {
+      featureMaps.push_back(neurons[i].get()->convolve(prevFeatureMaps[j]));
     }
   }
 
-  //const vector<Neuron> &neurons = prevLayer_->getNeurons();
-  /*
-  foreach neurons {
-  foreach prevNeurons, i {
-  foreach prevNeuronsFmaps;
-  neuron.fmaps[i] = neuron.convolve(prevNeuronsFmap);
-  }
-  }
-  }
-  */
-  cout << "CLayer done\n";
+  //cout << "CLayer done\n";
 }
 
-PLayer::PLayer(vector<shared_ptr<PNeuron>> neurons) : Layer<PNeuron>() {
-  setNeurons(neurons);
-}
+PLayer::PLayer(PNeuron neurons) :
+  neurons(neurons) { }
 
-void
-PLayer::activate(vector<shared_ptr<Neuron>> prevNeurons, const cl::Context &context) {
-  //printf("PLayer done\n");
-  /*
-  foreach neurons {
-  foreach prevNeurons {
-  foreach prevNeuronsFmaps {
-  neuron.pool(prevNeuronsFmap);
-  }
-  }
-  }
-  */
-}
+void PLayer::activate(vector<mBuffer> prevFeatureMaps, const cl::Context & context) { }

@@ -68,6 +68,13 @@ int main(int argc, char** argv)
       kernelData[i + kernelWidth * j] = 0.1f;
   }
   
+  float *kernelData2 = new float[kernelWidth * kernelHeight];
+  for (int i = 0; i < kernelWidth; ++i)
+  {
+    for (int j = 0; j < kernelHeight; ++j)
+      kernelData2[i + kernelWidth * j] = 0.4f;
+  }
+
   //common stuff >
   Mat inImage = imread("input.png");
   Mat inImage2 = imread("input2.png");
@@ -95,52 +102,31 @@ int main(int argc, char** argv)
   cl::Buffer inImgBuf2 = cl::Buffer(context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, sizeof(cl_uchar) * 3 * inImgWidth2 * inImgHeight2, (void*)inImage2.data);
   //< common stuff
   
-  CNeuron cneuron(context, device, commandQueue);
-  cneuron.setKernel(kernelData, kernelWidth);
-  vector<shared_ptr<CNeuron>> cNeurons;
+  ILayer iLayer(inImage);
+  
+  CNeuron cn0(kernelData, kernelWidth, context, device, commandQueue);
+  CNeuron cn1(kernelData2, kernelWidth, context, device, commandQueue);
 
-  cNeurons.push_back(make_shared<CNeuron>(cneuron));
-  CLayer cLayer(cNeurons);
+  vector<shared_ptr<CNeuron>> cns;
+  cns.push_back(make_shared<CNeuron>(cn0));
+  cns.push_back(make_shared<CNeuron>(cn1));
+  CLayer cLayer(cns);
   
-  
-  vector<Mat> fmaps;
-  fmaps.push_back(inImage);
-  fmaps.push_back(inImage2);
-  CNeuron cn0(context, device, commandQueue);
-  cn0.Neuron::setFeatureMap(fmaps);
-  
-  vector<shared_ptr<Neuron>> cns0;
-  cns0.push_back(make_shared<Neuron>(cn0));
-  cLayer.activate(cns0, context);
-  
+  iLayer.activate(context);
+#if 1
+  cLayer.activate(iLayer.getFetureMaps(), context);
 
-  //cLayer.getNeurons()[0].get()->convolve(make_shared<cl::Buffer>(inImgBuf2), inImgWidth2, inImgHeight2);
-  //cLayer.getNeurons()[0].get()->convolve(make_shared<cl::Buffer>(inImgBuf), inImgWidth, inImgHeight);
-  
-  const vector<Mat> &cmaps = cLayer.getNeurons()[0].get()->getFeatureMaps();
-  
-  inImgWidth = cmaps[0].size().width;
-  inImgHeight = cmaps[0].size().height;
-
-  inImgWidth2 = cmaps[1].size().width;
-  inImgHeight2 = cmaps[1].size().height;
-  
-  inImgBuf  = cl::Buffer(context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, sizeof(cl_uchar) * 3 * inImgWidth * inImgHeight, (void*)cmaps[0].data);
-  inImgBuf2 = cl::Buffer(context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, sizeof(cl_uchar) * 3 * inImgWidth2 * inImgHeight2, (void*)cmaps[1].data);
-  
-  PNeuron pneuron(context, device, commandQueue);
-  pneuron.setPoolCoef(poolCoef);
-  pneuron.pool(&inImgBuf2, inImgWidth2, inImgHeight2);
-  pneuron.pool(&inImgBuf, inImgWidth, inImgHeight);
-
-  const vector<Mat> &maps = pneuron.getFeatureMaps();
   char* x = new char[32];
-  for (int i = 0; i < maps.size(); i++) {
+  vector<mBuffer> out = cLayer.getFetureMaps();
+  for (int i = 0; i < out.size(); i++) {
+    mBuffer o = out[i];
+    Mat image = Mat::zeros(Size(o.width, o.height), CV_8UC3);
+    commandQueue.enqueueReadBuffer(*o.data.get(), CL_TRUE, 0, sizeof(cl_uchar) * 3 * o.width * o.height, image.data);
     sprintf(x, "output%d.png", i);
-    imwrite(x, maps[i]);
+    imwrite(x, image);
   }
   delete[] x;
-  
+#endif
   cout << "done!\n";
   return 0;
 }

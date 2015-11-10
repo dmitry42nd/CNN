@@ -9,18 +9,20 @@
 using namespace std;
 using namespace cv;
 
+struct mBuffer {
+  shared_ptr<cl::Buffer> data;
+  int width;
+  int height;
+};
+
 class Neuron {
 protected:
-  vector<Mat> featureMaps;
-
   //const stuff
   const cl::Context      &context;
   const cl::Device       &device;
   const cl::CommandQueue &commandQueue;
 public:
   Neuron(const cl::Context &context, const cl::Device &device, const cl::CommandQueue &commandQueue);
-  const vector<Mat> &getFeatureMaps();
-  void setFeatureMap(vector<Mat> featureMaps);
 };
 
 class CNeuron : public Neuron {
@@ -42,7 +44,7 @@ public:
   CNeuron(float *kernelData, int kernelWidth, const cl::Context &context, const cl::Device &device, const cl::CommandQueue &commandQueue);
   CNeuron(const cl::Context &context, const cl::Device &device, const cl::CommandQueue &commandQueue);
 
-  int convolve(const shared_ptr<cl::Buffer> inImgBuf, int inImgWidth, int inImgHeight);
+  mBuffer convolve(const mBuffer inImgBuf);
   void setKernel(float *kernel, int width);
 };
 
@@ -63,48 +65,48 @@ public:
   PNeuron(const cl::Context &context, const cl::Device &device, const cl::CommandQueue &commandQueue);
   PNeuron(float poolCoef, const cl::Context &context, const cl::Device &device, const cl::CommandQueue &commandQueue);
 
-  int pool(const cl::Buffer *inImgBuf, int inImgWidth, int inImgHeight);
+  mBuffer pool(const  mBuffer inImgBuf);
   void setPoolCoef(float poolCoef);
 };
 
 
 
-template<typename NeuronType>
 class Layer {
 protected:
-  vector<shared_ptr<NeuronType>> neurons;
+  vector<mBuffer> featureMaps;
 public:
   virtual ~Layer();
   Layer();
-  virtual void activate(vector<shared_ptr<Neuron>> prevNeurons, const cl::Context &context);
-  virtual vector<shared_ptr<NeuronType>> getNeurons(); //why it must be virtual?
-  void setNeurons(vector<shared_ptr<NeuronType>> neurons);
+  virtual void activate(vector<mBuffer> prevFeatureMaps, const cl::Context &context);
+  vector<mBuffer> getFetureMaps () { return featureMaps; };
 };
 
-class ILayer : public Layer<Neuron> {
+class ILayer : public Layer {
+protected:
+  Mat inImage;
 public:
-  ILayer(char* path_);
-  void activate(vector<shared_ptr<Neuron>> prevNeurons, const cl::Context &context) override;
-  //vector<shared_ptr<Neuron>> getNeurons();
+  ILayer(Mat inImage);
+  void activate(const cl::Context &context);
 };
 
-class OLayer : public Layer<Neuron> {
+class OLayer : public Layer {
 public:
   OLayer();
-  void activate(vector<shared_ptr<Neuron>> prevNeurons, const cl::Context &context) override;
-  //vector<shared_ptr<Neuron>> getNeurons();
+  void activate(vector<mBuffer> prevFeatureMaps, const cl::Context &context) override;
 };
 
-class CLayer : public Layer<CNeuron> {
+class CLayer : public Layer {
+protected:
+  vector<shared_ptr<CNeuron>> neurons;
 public:
   CLayer(vector<shared_ptr<CNeuron>> neurons);
-  void activate(vector<shared_ptr<Neuron>> prevNeurons, const cl::Context &context) override;
-  //vector<shared_ptr<CNeuron>> getNeurons();
+  void activate(vector<mBuffer> prevFeatureMaps, const cl::Context &context) override;
 };
 
-class PLayer : public Layer<PNeuron> {
+class PLayer : public Layer {
+protected:
+  PNeuron neurons;
 public:
-  PLayer(vector<shared_ptr<PNeuron>> neurons);
-  void activate(vector<shared_ptr<Neuron>> prevNeurons, const cl::Context &context) override;
-  //vector<shared_ptr<PNeuron>> getNeurons();
+  PLayer(PNeuron neurons);
+  void activate(vector<mBuffer> prevFeatureMaps, const cl::Context &context) override;
 };
