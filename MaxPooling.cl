@@ -1,8 +1,8 @@
 __kernel void Pooling
 (
-	__global uchar* inImage,
+	__global int* inImage,
 	float poolCoef,
-	__global uchar* outImage
+	__global int* outImage
 )
 {
 	int outImgWidth = get_global_size(0), koef = convert_int(1 / poolCoef), inImgWidth = koef * outImgWidth,
