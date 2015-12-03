@@ -2,11 +2,11 @@ int sat(int min, int val, int max) {
   return val > min ? (val < max ? val : max) : min;
 }
 
-__kernel void Convolution(__global uchar* inImage,
-  int kernelWidth,
-  int kernelHeight,
-  __global float* kernelData,
-  __global uchar* outImage) {
+__kernel void Convolution(__global int* inImage,
+                          int kernelWidth,
+                          int kernelHeight,
+                          __global float* kernelData,
+                          __global int* outImage) {
   int r = get_global_id(0),
       c = get_global_id(1);
 
@@ -27,7 +27,7 @@ __kernel void Convolution(__global uchar* inImage,
       }
     }
   }
-  outImage[3 * (r*imgWidth + c)] = pix[0] / div;
+  outImage[3 * (r*imgWidth + c)]     = pix[0] / div;
   outImage[3 * (r*imgWidth + c) + 1] = pix[1] / div;
   outImage[3 * (r*imgWidth + c) + 2] = pix[2] / div;
 }

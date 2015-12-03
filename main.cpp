@@ -74,8 +74,12 @@ int main(int argc, char** argv)
   }
 
   //common stuff >
-  Mat inImage = imread("input2.png");
-  Mat inImage2 = imread("input2.png");
+  Mat inImage = imread("input.png");
+  inImage.convertTo(inImage, CV_32SC3);
+  inImage.convertTo(inImage, CV_32SC3);
+  Mat inImage2 = imread("input.png");
+  inImage2.convertTo(inImage, CV_32SC3);
+
   if (inImage.empty() || inImage2.empty()) {
     cout << "Image is empty" << endl;
     return 1;
@@ -95,9 +99,6 @@ int main(int argc, char** argv)
   context = cl::Context(device);
   
   commandQueue = cl::CommandQueue(context, device);
-
-  cl::Buffer inImgBuf  = cl::Buffer(context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, sizeof(cl_uchar) * 3 * inImgWidth * inImgHeight, (void*)inImage.data);
-  cl::Buffer inImgBuf2 = cl::Buffer(context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, sizeof(cl_uchar) * 3 * inImgWidth2 * inImgHeight2, (void*)inImage2.data);
   //< common stuff
 
 //Input Layer
@@ -116,27 +117,26 @@ int main(int argc, char** argv)
   shared_ptr<PLayer> pLayer;// = make_shared<PLayer>(make_shared<PNeuron>(pn0));
 
   iLayer.activate(context);
+  
   cLayer = make_shared<CLayer>(cns);
   cLayer->activate(iLayer.getFeatureMaps(), context);
-
+  
+  /*
   pLayer = make_shared<PLayer>(make_shared<PNeuron>(pn0));
-  pLayer->activate(cLayer->getFeatureMaps(), context);
-
+  pLayer->activate(cLayer.getFeatureMaps(), context);
+  */
+  /*
   cLayer = make_shared<CLayer>(cns);
   cLayer->activate(pLayer->getFeatureMaps(), context);
-  
-  cLayer->activate(cLayer->getFeatureMaps(), context);
-  cLayer->activate(cLayer->getFeatureMaps(), context);
-  cLayer->activate(cLayer->getFeatureMaps(), context);
-  cLayer->activate(cLayer->getFeatureMaps(), context);
-  
+  */
   char* x = new char[32];
   vector<mBuffer> out = cLayer->getFeatureMaps();
   for (int i = 0; i < out.size(); i++) {
     mBuffer o = out[i];
-    Mat image = Mat::zeros(Size(o.width, o.height), CV_8UC3);
-    commandQueue.enqueueReadBuffer(*o.data.get(), CL_TRUE, 0, sizeof(cl_uchar) * 3 * o.width * o.height, image.data);
+    Mat image = Mat::zeros(Size(o.width, o.height), CV_32SC3);
+    commandQueue.enqueueReadBuffer(*o.data.get(), CL_TRUE, 0, sizeof(cl_int) * 3 * o.width * o.height, image.data);
     sprintf(x, "output%d.png", i);
+    image.convertTo(image, CV_8UC3);
     imwrite(x, image);
   }
   delete[] x;

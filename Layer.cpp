@@ -55,7 +55,7 @@ int CNeuron::init() {
 mBuffer CNeuron::convolve(const mBuffer inImgBuf) {
   int convImgWidth  = inImgBuf.width;
   int convImgHeight = inImgBuf.height;
-  cl::Buffer convImgBuf = cl::Buffer(context, NULL, sizeof(cl_uchar) * 3 * convImgWidth * convImgHeight, (void *)NULL);
+  cl::Buffer convImgBuf = cl::Buffer(context, NULL, sizeof(cl_int) * 3 * convImgWidth * convImgHeight, (void *)NULL);
 
   kernel.setArg(0, sizeof(cl_mem), (void*)inImgBuf.data.get());
   kernel.setArg(1, sizeof(cl_int), &kernelWidth);
@@ -63,7 +63,7 @@ mBuffer CNeuron::convolve(const mBuffer inImgBuf) {
   kernel.setArg(3, sizeof(cl_mem), (void*)&kernelBuf);
   kernel.setArg(4, sizeof(cl_mem), (void*)&convImgBuf);
   
-  commandQueue.enqueueNDRangeKernel(kernel, cl::NDRange(2), cl::NDRange(convImgWidth, convImgHeight), cl::NullRange);
+  commandQueue.enqueueNDRangeKernel(kernel, cl::NDRange(2), cl::NDRange(convImgHeight-1, convImgWidth), cl::NullRange);
   commandQueue.finish();
   
   mBuffer res = {
@@ -128,7 +128,7 @@ mBuffer PNeuron::pool(const mBuffer inImgBuf)
 {
   int poolImgWidth = int(poolCoef * inImgBuf.width);
   int poolImgHeight = int(poolCoef * inImgBuf.height);
-  cl::Buffer poolImgBuf = cl::Buffer(context, CL_MEM_ALLOC_HOST_PTR, sizeof(cl_uchar) * 3 * poolImgWidth * poolImgHeight, NULL);
+  cl::Buffer poolImgBuf = cl::Buffer(context, CL_MEM_ALLOC_HOST_PTR, sizeof(cl_int) * 3 * poolImgWidth * poolImgHeight, NULL);
 
   kernel.setArg(0, sizeof(cl_mem), (void*)inImgBuf.data.get());
   kernel.setArg(1, sizeof(cl_float), &poolCoef);
@@ -166,7 +166,7 @@ ILayer::ILayer(Mat inImage) :
 
 void ILayer::activate(const cl::Context & context) {
   mBuffer image {
-    make_shared<cl::Buffer>(cl::Buffer(context, CL_MEM_USE_HOST_PTR, sizeof(cl_uchar) * 3 * inImage.size().width * inImage.size().height, inImage.data)),
+    make_shared<cl::Buffer>(cl::Buffer(context, CL_MEM_USE_HOST_PTR, sizeof(cl_int) * 3 * inImage.size().width * inImage.size().height, inImage.data)),
     inImage.size().width,
     inImage.size().height 
   };
