@@ -53,6 +53,7 @@ int CNeuron::init() {
 }
 
 shared_ptr<cl::Buffer> CNeuron::convolve(const FeatureMaps inFMaps) {
+  int aggregate = 0;
   int convImgWidth  = inFMaps.width;
   int convImgHeight = inFMaps.height;
 
@@ -64,12 +65,20 @@ shared_ptr<cl::Buffer> CNeuron::convolve(const FeatureMaps inFMaps) {
   kernel.setArg(2, sizeof(cl_int), &kernelHeight);
   kernel.setArg(3, sizeof(cl_mem), (void*)&kernelBuf);
   kernel.setArg(4, sizeof(cl_mem), (void*)&convImgBuf);
+  kernel.setArg(5, sizeof(cl_int), &aggregate);
   
-  for (int j = 0; j < inFMaps.buffers.size(); j++) {
+  for (int j = 0; j < inFMaps.buffers.size()-1; j++) {
     kernel.setArg(0, sizeof(cl_mem), (void*)inFMaps.buffers[j].get());
     commandQueue.enqueueNDRangeKernel(kernel, cl::NDRange(2), cl::NDRange(convImgWidth, convImgHeight-1), cl::NullRange);
     commandQueue.finish();
   }
+
+  //final aggregate level
+  aggregate = inFMaps.buffers.size();
+  kernel.setArg(0, sizeof(cl_mem), (void*)inFMaps.buffers[inFMaps.buffers.size() - 1].get());
+  kernel.setArg(5, sizeof(cl_int), &aggregate);
+  commandQueue.enqueueNDRangeKernel(kernel, cl::NDRange(2), cl::NDRange(convImgWidth, convImgHeight - 1), cl::NullRange);
+  commandQueue.finish();
 
   free(zeros);
   return make_shared<cl::Buffer>(convImgBuf);

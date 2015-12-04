@@ -6,7 +6,8 @@ __kernel void Convolution(__global int* inImage,
                           int kernelWidth,
                           int kernelHeight,
                           __global float* kernelData,
-                          __global int* outImage) {
+                          __global int* outImage,
+                          int aggregate) {
   int c = get_global_id(0),
       r = get_global_id(1);
 
@@ -15,19 +16,23 @@ __kernel void Convolution(__global int* inImage,
 
   int kernelMid = kernelHeight*kernelWidth / 2;
 
-  float div = 0;
-  for (int i = 0; i < kernelHeight*kernelWidth; i++) {
-    div += kernelData[i];
-  }
-  int pix[3] = { 0,0,0 };
+  //int pix[3] = { 0,0,0 };
   for (int m = -kernelHeight / 2; m <= kernelHeight / 2; m++) {
     for (int n = -kernelWidth / 2; n <= kernelWidth / 2; n++) {
       for (int ch = 0; ch < 3; ch++) {
-        pix[ch] += inImage[3 * (sat(0, r + m, imgHeight) * imgWidth + sat(0, c + n, imgWidth)) + ch] * kernelData[kernelMid + m * kernelWidth + n];
+        outImage[3 * (r*imgWidth + c) + ch] += inImage[3 * (sat(0, r + m, imgHeight - 1) * imgWidth + sat(0, c + n, imgWidth)) + ch] * kernelData[kernelMid + m * kernelWidth + n];
       }
     }
   }
-  outImage[3 * (r*imgWidth + c)]     = pix[0] / div;
-  outImage[3 * (r*imgWidth + c) + 1] = pix[1] / div;
-  outImage[3 * (r*imgWidth + c) + 2] = pix[2] / div;
+
+  if (aggregate) {
+    float normDiv = 0;
+    for (int i = 0; i < kernelHeight*kernelWidth; i++) {
+      normDiv += kernelData[i];
+    }
+    float finalDiv = normDiv*aggregate;
+    outImage[3 * (r*imgWidth + c)]     /= finalDiv;
+    outImage[3 * (r*imgWidth + c) + 1] /= finalDiv;
+    outImage[3 * (r*imgWidth + c) + 2] /= finalDiv;
+  }
 }

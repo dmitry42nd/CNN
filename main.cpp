@@ -74,13 +74,22 @@ int main(int argc, char** argv)
   for (int i = 0; i < kernelWidth2; ++i) {
     for (int j = 0; j < kernelHeight2; ++j)
       if(i==0 || j==0 || i== kernelWidth2-1 || j== kernelHeight2-1)
-        kernelData2[i + kernelWidth2 * j] = 0.5f;
+        kernelData2[i + kernelWidth2 * j] = 0.8f;
       else if (i == 1 || j == 1 || i == kernelWidth2 - 2 || j == kernelHeight2 - 2)
-        kernelData2[i + kernelWidth2 * j] = 0.2f;
+        kernelData2[i + kernelWidth2 * j] = 0.4f;
       else
-        kernelData2[i + kernelWidth2 * j] = 0.0f;
+        kernelData2[i + kernelWidth2 * j] = 0.2f;
   }
   kernelData2[3 + kernelWidth2 * 3] = -5.f;
+
+  int kernelWidth3 = 1;
+  int kernelHeight3 = 1;
+  float *kernelData3 = new float[kernelWidth3 * kernelHeight3];
+  for (int i = 0; i < kernelWidth3; ++i) {
+    for (int j = 0; j < kernelHeight3; ++j)
+      kernelData2[i + kernelWidth3 * j] = 1.f;
+  }
+
 
 
   //common stuff >
@@ -140,12 +149,12 @@ int main(int argc, char** argv)
 //cnn run
   iLayer->activate(inImage, context);
   cLayer0->activate(iLayer->getFeatureMaps());
-  //pLayer->activate(cLayer0->getFeatureMaps());
-  //cLayer1->activate(pLayer->getFeatureMaps());
+  pLayer->activate(cLayer0->getFeatureMaps());
+  cLayer1->activate(pLayer->getFeatureMaps());
   
   char* x = new char[32];
   
-  FeatureMaps out = cLayer0->getFeatureMaps();
+  FeatureMaps out = cLayer1->getFeatureMaps();
   
   for (int i = 0; i < out.buffers.size(); i++) {
     cl::Buffer *o = out.buffers[i].get();
