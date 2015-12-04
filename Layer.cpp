@@ -55,8 +55,10 @@ int CNeuron::init() {
 shared_ptr<cl::Buffer> CNeuron::convolve(const FeatureMaps inFMaps) {
   int convImgWidth  = inFMaps.width;
   int convImgHeight = inFMaps.height;
-  
-  cl::Buffer convImgBuf = cl::Buffer(context, NULL, sizeof(cl_int) * 3 * convImgWidth * convImgHeight, (void *)NULL);
+
+  //just to init buffer by zeros
+  cl_int *zeros = (cl_int *)calloc(3 * convImgWidth * convImgHeight, sizeof(cl_int));
+  cl::Buffer convImgBuf = cl::Buffer(context, CL_MEM_COPY_HOST_PTR, sizeof(cl_int) * 3 * convImgWidth * convImgHeight, (void *)zeros);
 
   kernel.setArg(1, sizeof(cl_int), &kernelWidth);
   kernel.setArg(2, sizeof(cl_int), &kernelHeight);
@@ -69,11 +71,12 @@ shared_ptr<cl::Buffer> CNeuron::convolve(const FeatureMaps inFMaps) {
     commandQueue.finish();
   }
 
+  free(zeros);
   return make_shared<cl::Buffer>(convImgBuf);
 }
 
 void CNeuron::setKernel(float *kernelData, int kernelWidth) {
-  CNeuron::kernelWidth = kernelWidth;
+  CNeuron::kernelWidth  = kernelWidth;
   CNeuron::kernelHeight = kernelWidth;
   kernelBuf = cl::Buffer(context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, sizeof(cl_float) * kernelWidth * kernelHeight, (void*)kernelData);
 }
@@ -124,17 +127,17 @@ void PNeuron::pool(const FeatureMaps inFMaps, FeatureMaps *outFMaps)
 {
   int poolImgWidth = int(poolCoef * inFMaps.width);
   int poolImgHeight = int(poolCoef * inFMaps.height);
-  
-  outFMaps->width  = poolImgWidth;
+
+  outFMaps->width = poolImgWidth;
   outFMaps->height = poolImgHeight;
 
-  kernel.setArg(2, sizeof(cl_mem), (void*)&poolImgBuf);
+  kernel.setArg(1, sizeof(cl_float), &poolCoef);
 
   for (int j = 0; j < inFMaps.buffers.size(); j++) {
-    cl::Buffer poolImgBuf = cl::Buffer(context, CL_MEM_ALLOC_HOST_PTR, sizeof(cl_int) * 3 * poolImgWidth * poolImgHeight, NULL);
-    
+    cl::Buffer poolImgBuf = cl::Buffer(context, NULL, sizeof(cl_int) * 3 * poolImgWidth * poolImgHeight, NULL);
+
     kernel.setArg(0, sizeof(cl_mem), (void*)inFMaps.buffers[j].get());
-    kernel.setArg(1, sizeof(cl_float), &poolCoef);
+    kernel.setArg(2, sizeof(cl_mem), (void*)&poolImgBuf);
 
     commandQueue.enqueueNDRangeKernel(kernel, cl::NDRange(2), cl::NDRange(poolImgWidth, poolImgHeight), cl::NullRange);
     commandQueue.finish();
@@ -149,8 +152,8 @@ void PNeuron::setPoolCoef(float poolCoef) {
 
 
 
-Layer::~Layer() { }
-Layer::Layer() { }
+Layer::~Layer() {}
+Layer::Layer() {}
 
 
 ILayer::ILayer() {}
@@ -179,14 +182,12 @@ CLayer::CLayer(vector<shared_ptr<CNeuron>> neurons) :
   neurons(neurons) { }
 
 void CLayer::activate(FeatureMaps prevFeatureMaps) {
-  featureMaps.width = prevFeatureMaps.width;
+  featureMaps.width  = prevFeatureMaps.width;
   featureMaps.height = prevFeatureMaps.height;
 
   for (int i = 0; i < neurons.size(); i++) {
     featureMaps.buffers.push_back(neurons[i].get()->convolve(prevFeatureMaps));
   }
-  
-  //cout << "CLayer done" << endl;
 }
 
 

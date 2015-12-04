@@ -70,8 +70,12 @@ int main(int argc, char** argv)
   float *kernelData2 = new float[kernelWidth * kernelHeight];
   for (int i = 0; i < kernelWidth; ++i) {
     for (int j = 0; j < kernelHeight; ++j)
-      kernelData2[i + kernelWidth * j] = 0.1f;
+      if(i==0 || j==0,i== kernelWidth-1, j== kernelHeight-1)
+        kernelData2[i + kernelWidth * j] = 1.f;
+      else 
+        kernelData2[i + kernelWidth * j] = 0.f;
   }
+  kernelData2[2 + kernelWidth * 2] = -5.f;
 
   //common stuff >
   Mat inImage = imread("input.png");
@@ -106,9 +110,10 @@ int main(int argc, char** argv)
   CNeuron cn1(kernelData2, kernelWidth, context, device, commandQueue);
 
   vector<shared_ptr<CNeuron>> cns;
-  for (int i = 0; i < 50; i ++)
+  for (int i = 0; i < 2; i ++)
     cns.push_back(make_shared<CNeuron>(cn0));
-  
+  for (int i = 0; i < 2; i++)
+    cns.push_back(make_shared<CNeuron>(cn1));
   
 //Pool Layer stuff
   PNeuron pn0(poolCoef, context, device, commandQueue);
@@ -121,10 +126,12 @@ int main(int argc, char** argv)
 //cnn run
   iLayer->activate(inImage, context);
   cLayer->activate(iLayer->getFeatureMaps());
-  //pLayer->activate(cLayer->getFeatureMaps());
+  pLayer->activate(cLayer->getFeatureMaps());
   
   char* x = new char[32];
-  FeatureMaps out = cLayer->getFeatureMaps();
+  
+  FeatureMaps out = pLayer->getFeatureMaps();
+  
   for (int i = 0; i < out.buffers.size(); i++) {
     cl::Buffer *o = out.buffers[i].get();
     Mat image = Mat::zeros(Size(out.width, out.height), CV_32SC3);

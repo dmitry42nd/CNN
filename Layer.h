@@ -33,7 +33,7 @@ private:
   int        kernelHeight;
 
   cl::Buffer kernelBuf;
-  cl::Buffer convImgBuf;
+
   cl::Program::Sources source;
   cl::Program          program;
   cl::Kernel           kernel;
@@ -54,7 +54,6 @@ private:
 
   float poolCoef;
 
-  cl::Buffer poolImgBuf;
   cl::Program::Sources source;
   cl::Program          program;
   cl::Kernel           kernel;
