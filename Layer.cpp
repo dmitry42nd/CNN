@@ -52,27 +52,24 @@ int CNeuron::init() {
   return 0;
 }
 
-mBuffer CNeuron::convolve(const mBuffer inImgBuf) {
-  int convImgWidth  = inImgBuf.width;
-  int convImgHeight = inImgBuf.height;
+shared_ptr<cl::Buffer> CNeuron::convolve(const FeatureMaps inFMaps) {
+  int convImgWidth  = inFMaps.width;
+  int convImgHeight = inFMaps.height;
+  
   cl::Buffer convImgBuf = cl::Buffer(context, NULL, sizeof(cl_int) * 3 * convImgWidth * convImgHeight, (void *)NULL);
 
-  kernel.setArg(0, sizeof(cl_mem), (void*)inImgBuf.data.get());
   kernel.setArg(1, sizeof(cl_int), &kernelWidth);
   kernel.setArg(2, sizeof(cl_int), &kernelHeight);
   kernel.setArg(3, sizeof(cl_mem), (void*)&kernelBuf);
   kernel.setArg(4, sizeof(cl_mem), (void*)&convImgBuf);
   
-  commandQueue.enqueueNDRangeKernel(kernel, cl::NDRange(2), cl::NDRange(convImgHeight-1, convImgWidth), cl::NullRange);
-  commandQueue.finish();
-  
-  mBuffer res = {
-    make_shared<cl::Buffer>(convImgBuf),
-    convImgWidth,
-    convImgHeight
-  };
+  for (int j = 0; j < inFMaps.buffers.size(); j++) {
+    kernel.setArg(0, sizeof(cl_mem), (void*)inFMaps.buffers[j].get());
+    commandQueue.enqueueNDRangeKernel(kernel, cl::NDRange(2), cl::NDRange(convImgHeight - 1, convImgWidth), cl::NullRange);
+    commandQueue.finish();
+  }
 
-  return res;
+  return make_shared<cl::Buffer>(convImgBuf);
 }
 
 void CNeuron::setKernel(float *kernelData, int kernelWidth) {
@@ -123,26 +120,27 @@ int PNeuron::init() {
   return 0;
 }
 
-
-mBuffer PNeuron::pool(const mBuffer inImgBuf)
+void PNeuron::pool(const FeatureMaps inFMaps, FeatureMaps *outFMaps)
 {
-  int poolImgWidth = int(poolCoef * inImgBuf.width);
-  int poolImgHeight = int(poolCoef * inImgBuf.height);
-  cl::Buffer poolImgBuf = cl::Buffer(context, CL_MEM_ALLOC_HOST_PTR, sizeof(cl_int) * 3 * poolImgWidth * poolImgHeight, NULL);
+  int poolImgWidth = int(poolCoef * inFMaps.width);
+  int poolImgHeight = int(poolCoef * inFMaps.height);
+  
+  outFMaps->width  = poolImgWidth;
+  outFMaps->height = poolImgHeight;
 
-  kernel.setArg(0, sizeof(cl_mem), (void*)inImgBuf.data.get());
-  kernel.setArg(1, sizeof(cl_float), &poolCoef);
   kernel.setArg(2, sizeof(cl_mem), (void*)&poolImgBuf);
 
-  commandQueue.enqueueNDRangeKernel(kernel, cl::NDRange(2), cl::NDRange(poolImgWidth, poolImgHeight), cl::NullRange);
-  commandQueue.finish();
+  for (int j = 0; j < inFMaps.buffers.size(); j++) {
+    cl::Buffer poolImgBuf = cl::Buffer(context, CL_MEM_ALLOC_HOST_PTR, sizeof(cl_int) * 3 * poolImgWidth * poolImgHeight, NULL);
+    
+    kernel.setArg(0, sizeof(cl_mem), (void*)inFMaps.buffers[j].get());
+    kernel.setArg(1, sizeof(cl_float), &poolCoef);
 
-  mBuffer res;
-  res.data = make_shared<cl::Buffer>(poolImgBuf);
-  res.width = poolImgWidth;
-  res.height = poolImgHeight;
+    commandQueue.enqueueNDRangeKernel(kernel, cl::NDRange(2), cl::NDRange(poolImgWidth, poolImgHeight), cl::NullRange);
+    commandQueue.finish();
 
-  return res;
+    outFMaps->buffers.push_back(make_shared<cl::Buffer>(poolImgBuf));
+  }
 }
 
 void PNeuron::setPoolCoef(float poolCoef) {
@@ -152,43 +150,42 @@ void PNeuron::setPoolCoef(float poolCoef) {
 
 
 Layer::~Layer() { }
-
 Layer::Layer() { }
 
-void Layer::activate(vector<mBuffer> prevFeatureMaps, const cl::Context & context)
-{
-  cout << "Virtual activate hidden layer function called\n";
-}
 
+ILayer::ILayer() {}
 
-ILayer::ILayer(Mat inImage) :
-  inImage(inImage) { }
-
-void ILayer::activate(const cl::Context & context) {
-  mBuffer image {
-    make_shared<cl::Buffer>(cl::Buffer(context, CL_MEM_USE_HOST_PTR, sizeof(cl_int) * 3 * inImage.size().width * inImage.size().height, inImage.data)),
-    inImage.size().width,
-    inImage.size().height 
-  };
-
-  featureMaps.push_back(image);
+void ILayer::activate(Mat inImage, const cl::Context &context) {
+  featureMaps.buffers.push_back(make_shared<cl::Buffer>(cl::Buffer(context, CL_MEM_USE_HOST_PTR, sizeof(cl_int) * 3 * inImage.size().width * inImage.size().height, inImage.data)));
+  featureMaps.width  = inImage.size().width;
+  featureMaps.height = inImage.size().height;
 }
 
   
-OLayer::OLayer() : Layer() {}
+OLayer::OLayer() {}
 
-void OLayer::activate(vector<mBuffer> prevFeatureMaps, const cl::Context & context) { }
+void OLayer::activate(FeatureMaps prevFeatureMaps) { }
 
+
+HiddenLayer::~HiddenLayer() {}
+HiddenLayer::HiddenLayer() {}
+
+void HiddenLayer::activate(FeatureMaps prevFeatureMaps)
+{
+  cout << "Virtual method of base class called. This shouldn't happen.";
+}
 
 CLayer::CLayer(vector<shared_ptr<CNeuron>> neurons) :
   neurons(neurons) { }
 
-void CLayer::activate(vector<mBuffer> prevFeatureMaps, const cl::Context &context) {
-  for (int j = 0; j < prevFeatureMaps.size(); j++) {
-    for (int i = 0; i < neurons.size(); i++) {
-      featureMaps.push_back(neurons[i].get()->convolve(prevFeatureMaps[j]));
-    }
+void CLayer::activate(FeatureMaps prevFeatureMaps) {
+  featureMaps.width = prevFeatureMaps.width;
+  featureMaps.height = prevFeatureMaps.height;
+
+  for (int i = 0; i < neurons.size(); i++) {
+    featureMaps.buffers.push_back(neurons[i].get()->convolve(prevFeatureMaps));
   }
+  
   //cout << "CLayer done" << endl;
 }
 
@@ -196,8 +193,6 @@ void CLayer::activate(vector<mBuffer> prevFeatureMaps, const cl::Context &contex
 PLayer::PLayer(shared_ptr<PNeuron> neuron) :
   neuron(neuron) { }
 
-void PLayer::activate(vector<mBuffer> prevFeatureMaps, const cl::Context & context) { 
-  for (int j = 0; j < prevFeatureMaps.size(); j++) {
-    featureMaps.push_back(neuron.get()->pool(prevFeatureMaps[j]));
-  }
+void PLayer::activate(FeatureMaps prevFeatureMaps) { 
+  neuron.get()->pool(prevFeatureMaps, &featureMaps);
 }

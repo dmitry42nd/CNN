@@ -9,8 +9,8 @@
 using namespace std;
 using namespace cv;
 
-struct mBuffer {
-  shared_ptr<cl::Buffer> data;
+struct FeatureMaps {
+  vector<shared_ptr<cl::Buffer>> buffers;
   int width;
   int height;
 };
@@ -44,7 +44,7 @@ public:
   CNeuron(float *kernelData, int kernelWidth, const cl::Context &context, const cl::Device &device, const cl::CommandQueue &commandQueue);
   CNeuron(const cl::Context &context, const cl::Device &device, const cl::CommandQueue &commandQueue);
 
-  mBuffer convolve(const mBuffer inImgBuf);
+  shared_ptr<cl::Buffer> convolve(const FeatureMaps inFMaps);
   void setKernel(float *kernel, int width);
 };
 
@@ -65,7 +65,7 @@ public:
   PNeuron(const cl::Context &context, const cl::Device &device, const cl::CommandQueue &commandQueue);
   PNeuron(float poolCoef, const cl::Context &context, const cl::Device &device, const cl::CommandQueue &commandQueue);
 
-  mBuffer pool(const  mBuffer inImgBuf);
+  void pool(const FeatureMaps inFMaps, FeatureMaps *outFMaps);
   void setPoolCoef(float poolCoef);
 };
 
@@ -73,40 +73,45 @@ public:
 
 class Layer {
 protected:
-  vector<mBuffer> featureMaps;
+  FeatureMaps featureMaps;
 public:
-  virtual ~Layer();
+  ~Layer();
   Layer();
-  virtual void activate(vector<mBuffer> prevFeatureMaps, const cl::Context &context);
-  vector<mBuffer> getFeatureMaps () { return featureMaps; };
+  FeatureMaps getFeatureMaps() { return featureMaps; };
 };
 
 class ILayer : public Layer {
-protected:
-  Mat inImage;
 public:
-  ILayer(Mat inImage);
-  void activate(const cl::Context &context);
+  ILayer();
+  void activate(Mat inImage, const cl::Context &context);
 };
 
 class OLayer : public Layer {
 public:
   OLayer();
-  void activate(vector<mBuffer> prevFeatureMaps, const cl::Context &context) override;
+  void activate(FeatureMaps getFeatureMaps);
 };
 
-class CLayer : public Layer {
+class HiddenLayer : public Layer {
+protected:
+public:
+  virtual ~HiddenLayer();
+  HiddenLayer();
+  virtual void activate(FeatureMaps prevFeatureMaps);
+};
+
+class CLayer : public HiddenLayer {
 protected:
   vector<shared_ptr<CNeuron>> neurons;
 public:
   CLayer(vector<shared_ptr<CNeuron>> neurons);
-  void activate(vector<mBuffer> prevFeatureMaps, const cl::Context &context) override;
+  void activate(FeatureMaps prevFeatureMaps) override;
 };
 
-class PLayer : public Layer {
+class PLayer : public HiddenLayer {
 protected:
   shared_ptr<PNeuron> neuron;
 public:
   PLayer(shared_ptr<PNeuron> neuron);
-  void activate(vector<mBuffer> prevFeatureMaps, const cl::Context &context) override;
+  void activate(FeatureMaps prevFeatureMaps) override;
 };

@@ -101,45 +101,42 @@ int main(int argc, char** argv)
   commandQueue = cl::CommandQueue(context, device);
   //< common stuff
 
-//Input Layer
-  ILayer iLayer(inImage);
-
-//Convolution Layer
+//Convolution Layer stuff
   CNeuron cn0(kernelData, kernelWidth, context, device, commandQueue);
   CNeuron cn1(kernelData2, kernelWidth, context, device, commandQueue);
 
   vector<shared_ptr<CNeuron>> cns;
-  cns.push_back(make_shared<CNeuron>(cn0));
-  cns.push_back(make_shared<CNeuron>(cn1));
-  shared_ptr<CLayer> cLayer;// = make_shared<CLayer>(cns);
-//Pool Layer
+  for (int i = 0; i < 50; i ++)
+    cns.push_back(make_shared<CNeuron>(cn0));
+  
+  
+//Pool Layer stuff
   PNeuron pn0(poolCoef, context, device, commandQueue);
-  shared_ptr<PLayer> pLayer;// = make_shared<PLayer>(make_shared<PNeuron>(pn0));
 
-  iLayer.activate(context);
-  
-  cLayer = make_shared<CLayer>(cns);
-  cLayer->activate(iLayer.getFeatureMaps(), context);
-  
-  
-  pLayer = make_shared<PLayer>(make_shared<PNeuron>(pn0));
-  pLayer->activate(cLayer->getFeatureMaps(), context);
-  
-  
-  cLayer = make_shared<CLayer>(cns);
-  cLayer->activate(pLayer->getFeatureMaps(), context);
+//init layers
+  shared_ptr<ILayer> iLayer(make_shared<ILayer>());
+  shared_ptr<CLayer> cLayer(make_shared<CLayer>(cns));
+  shared_ptr<PLayer> pLayer(make_shared<PLayer>(make_shared<PNeuron>(pn0)));
+
+//cnn run
+  iLayer->activate(inImage, context);
+  cLayer->activate(iLayer->getFeatureMaps());
+  //pLayer->activate(cLayer->getFeatureMaps());
   
   char* x = new char[32];
-  vector<mBuffer> out = cLayer->getFeatureMaps();
-  for (int i = 0; i < out.size(); i++) {
-    mBuffer o = out[i];
-    Mat image = Mat::zeros(Size(o.width, o.height), CV_32SC3);
-    commandQueue.enqueueReadBuffer(*o.data.get(), CL_TRUE, 0, sizeof(cl_int) * 3 * o.width * o.height, image.data);
+  FeatureMaps out = cLayer->getFeatureMaps();
+  for (int i = 0; i < out.buffers.size(); i++) {
+    cl::Buffer *o = out.buffers[i].get();
+    Mat image = Mat::zeros(Size(out.width, out.height), CV_32SC3);
+    commandQueue.enqueueReadBuffer(*o, CL_TRUE, 0, sizeof(cl_int) * 3 * out.width * out.height, image.data);
     sprintf(x, "output%d.png", i);
     image.convertTo(image, CV_8UC3);
     imwrite(x, image);
   }
+  
   delete[] x;
+  delete[] kernelData;
+  delete[] kernelData2;
 
   cout << "done!\n";
   return 0;
