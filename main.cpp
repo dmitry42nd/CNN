@@ -57,31 +57,37 @@ int main(int argc, char** argv)
   cnn.run();
 #endif
 
-  int kernelWidth, kernelHeight;
+  
   float* kernelData;
   float poolCoef = 0.5;
-  kernelWidth = 5; kernelHeight = 5;
+  int kernelWidth = 9; 
+  int kernelHeight = 9;
   kernelData = new float[kernelWidth * kernelHeight];
   for (int i = 0; i < kernelWidth; ++i) {
     for (int j = 0; j < kernelHeight; ++j)
       kernelData[i + kernelWidth * j] = 0.1f;
   }
   
-  float *kernelData2 = new float[kernelWidth * kernelHeight];
-  for (int i = 0; i < kernelWidth; ++i) {
-    for (int j = 0; j < kernelHeight; ++j)
-      if(i==0 || j==0,i== kernelWidth-1, j== kernelHeight-1)
-        kernelData2[i + kernelWidth * j] = 1.f;
-      else 
-        kernelData2[i + kernelWidth * j] = 0.f;
+  int kernelWidth2 = 7; 
+  int kernelHeight2 = 7;
+  float *kernelData2 = new float[kernelWidth2 * kernelHeight2];
+  for (int i = 0; i < kernelWidth2; ++i) {
+    for (int j = 0; j < kernelHeight2; ++j)
+      if(i==0 || j==0 || i== kernelWidth2-1 || j== kernelHeight2-1)
+        kernelData2[i + kernelWidth2 * j] = 0.5f;
+      else if (i == 1 || j == 1 || i == kernelWidth2 - 2 || j == kernelHeight2 - 2)
+        kernelData2[i + kernelWidth2 * j] = 0.2f;
+      else
+        kernelData2[i + kernelWidth2 * j] = 0.0f;
   }
-  kernelData2[2 + kernelWidth * 2] = -5.f;
+  kernelData2[3 + kernelWidth2 * 3] = -5.f;
+
 
   //common stuff >
-  Mat inImage = imread("input.png");
+  Mat inImage = imread("input2.png");
   inImage.convertTo(inImage, CV_32SC3);
   inImage.convertTo(inImage, CV_32SC3);
-  Mat inImage2 = imread("input.png");
+  Mat inImage2 = imread("input2.png");
   inImage2.convertTo(inImage, CV_32SC3);
 
   if (inImage.empty() || inImage2.empty()) {
@@ -107,30 +113,39 @@ int main(int argc, char** argv)
 
 //Convolution Layer stuff
   CNeuron cn0(kernelData, kernelWidth, context, device, commandQueue);
-  CNeuron cn1(kernelData2, kernelWidth, context, device, commandQueue);
+  CNeuron cn1(kernelData2, kernelWidth2, context, device, commandQueue);
 
-  vector<shared_ptr<CNeuron>> cns;
-  for (int i = 0; i < 2; i ++)
-    cns.push_back(make_shared<CNeuron>(cn0));
-  for (int i = 0; i < 2; i++)
-    cns.push_back(make_shared<CNeuron>(cn1));
-  
+  vector<shared_ptr<CNeuron>> cns0;
+  int l1 = 2;
+  for (int i = 0; i < l1; i ++)
+    cns0.push_back(make_shared<CNeuron>(cn1));
+  for (int i = 0; i < l1; i++)
+    cns0.push_back(make_shared<CNeuron>(cn0));
+
+  vector<shared_ptr<CNeuron>> cns1;
+  int l2 = 1;
+  for (int i = 0; i < l2; i++)
+    cns1.push_back(make_shared<CNeuron>(cn0));
+  for (int i = 0; i < l2; i++)
+    cns1.push_back(make_shared<CNeuron>(cn1));
+
 //Pool Layer stuff
   PNeuron pn0(poolCoef, context, device, commandQueue);
 
 //init layers
   shared_ptr<ILayer> iLayer(make_shared<ILayer>());
-  shared_ptr<CLayer> cLayer(make_shared<CLayer>(cns));
+  shared_ptr<CLayer> cLayer0(make_shared<CLayer>(cns0));
   shared_ptr<PLayer> pLayer(make_shared<PLayer>(make_shared<PNeuron>(pn0)));
-
+  shared_ptr<CLayer> cLayer1(make_shared<CLayer>(cns1));
 //cnn run
   iLayer->activate(inImage, context);
-  cLayer->activate(iLayer->getFeatureMaps());
-  pLayer->activate(cLayer->getFeatureMaps());
+  cLayer0->activate(iLayer->getFeatureMaps());
+  //pLayer->activate(cLayer0->getFeatureMaps());
+  //cLayer1->activate(pLayer->getFeatureMaps());
   
   char* x = new char[32];
   
-  FeatureMaps out = pLayer->getFeatureMaps();
+  FeatureMaps out = cLayer0->getFeatureMaps();
   
   for (int i = 0; i < out.buffers.size(); i++) {
     cl::Buffer *o = out.buffers[i].get();

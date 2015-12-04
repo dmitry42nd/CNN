@@ -7,8 +7,8 @@ __kernel void Convolution(__global int* inImage,
                           int kernelHeight,
                           __global float* kernelData,
                           __global int* outImage) {
-  int r = get_global_id(0),
-      c = get_global_id(1);
+  int c = get_global_id(0),
+      r = get_global_id(1);
 
   int  imgWidth = get_global_size(0),
       imgHeight = get_global_size(1);
