@@ -69,7 +69,7 @@ shared_ptr<cl::Buffer> CNeuron::convolve(const FeatureMaps inFMaps) {
   
   for (int j = 0; j < inFMaps.buffers.size()-1; j++) {
     kernel.setArg(0, sizeof(cl_mem), (void*)inFMaps.buffers[j].get());
-    commandQueue.enqueueNDRangeKernel(kernel, cl::NDRange(2), cl::NDRange(convImgWidth, convImgHeight-1), cl::NullRange);
+    commandQueue.enqueueNDRangeKernel(kernel, cl::NDRange(2), cl::NDRange(convImgWidth, convImgHeight), cl::NullRange);
     commandQueue.finish();
   }
 
@@ -77,7 +77,7 @@ shared_ptr<cl::Buffer> CNeuron::convolve(const FeatureMaps inFMaps) {
   aggregate = inFMaps.buffers.size();
   kernel.setArg(0, sizeof(cl_mem), (void*)inFMaps.buffers[inFMaps.buffers.size() - 1].get());
   kernel.setArg(5, sizeof(cl_int), &aggregate);
-  commandQueue.enqueueNDRangeKernel(kernel, cl::NDRange(2), cl::NDRange(convImgWidth, convImgHeight - 1), cl::NullRange);
+  commandQueue.enqueueNDRangeKernel(kernel, cl::NDRange(2), cl::NDRange(convImgWidth, convImgHeight), cl::NullRange);
   commandQueue.finish();
 
   free(zeros);
