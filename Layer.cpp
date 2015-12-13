@@ -52,7 +52,7 @@ int CNeuron::init() {
 }
 
 shared_ptr<cl::Buffer> CNeuron::convolve(const FeatureMaps inFMaps) {
-  printf("%d %d\n", inFMaps.buffers.size(), kernelsData.size());
+  //printf("%d %d\n", inFMaps.buffers.size(), kernelsData.size());
   int aggregate = 0;
   int convImgWidth  = inFMaps.width;
   int convImgHeight = inFMaps.height;
