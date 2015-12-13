@@ -29,7 +29,8 @@ __kernel void Convolution(__global int* inImage,
   outImage[3 * (r*imgWidth + c) + 1] += pix[1];
   outImage[3 * (r*imgWidth + c) + 2] += pix[2];
 
-  if (aggregate) {
+  if(aggregate) {
+
     float normDiv = 0;
     for (int i = 0; i < kernelWidth*kernelWidth; i++) {
       normDiv += kernelData[i];

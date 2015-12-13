@@ -65,7 +65,7 @@ shared_ptr<cl::Buffer> CNeuron::convolve(const FeatureMaps inFMaps) {
   kernel.setArg(3, sizeof(cl_mem), (void*)&convImgBuf);
   kernel.setArg(4, sizeof(cl_int), &aggregate);
   
-  for (int j = 0; j < inFMaps.buffers.size() - 1; j++) {
+  for (size_t j = 0; j < inFMaps.buffers.size() - 1; j++) {
     kernelBuf = cl::Buffer(context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, sizeof(cl_float) * kernelWidth * kernelWidth, (void*)kernelsData[j]);
     kernel.setArg(0, sizeof(cl_mem), (void*)inFMaps.buffers[j].get());
     kernel.setArg(2, sizeof(cl_mem), (void*)&kernelBuf);
@@ -193,7 +193,7 @@ void CLayer::activate(FeatureMaps prevFeatureMaps) {
   featureMaps.width  = prevFeatureMaps.width;
   featureMaps.height = prevFeatureMaps.height;
 
-  for (int i = 0; i < neurons.size(); i++) {
+  for (size_t i = 0; i < neurons.size(); i++) {
     featureMaps.buffers.push_back(neurons[i].get()->convolve(prevFeatureMaps));
   }
 }
@@ -207,7 +207,7 @@ void PLayer::activate(FeatureMaps prevFeatureMaps) {
   featureMaps.width = prevFeatureMaps.width*poolCoef;
   featureMaps.height = prevFeatureMaps.height*poolCoef;
 
-  for (int i = 0; i < neurons.size(); i++) {
+  for (size_t i = 0; i < neurons.size(); i++) {
     featureMaps.buffers.push_back(neurons[i].get()->pool(prevFeatureMaps.buffers[i], featureMaps.width, featureMaps.height, poolCoef));
   }
 }
