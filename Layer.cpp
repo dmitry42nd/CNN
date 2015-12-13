@@ -10,10 +10,10 @@ Neuron::Neuron(const cl::Context & context, const cl::Device & device, const cl:
 }
 
 
-CNeuron::CNeuron(vector<float*>kernelData, int kernelWidth, const cl::Context &context, const cl::Device &device, const cl::CommandQueue &commandQueue) : 
+CNeuron::CNeuron(vector<float*>kernelsData, int kernelWidth, const cl::Context &context, const cl::Device &device, const cl::CommandQueue &commandQueue) : 
   Neuron(context, device, commandQueue),
   kernelWidth(kernelWidth) {
-  setKernel(kernelData, kernelWidth);
+  setKernels(kernelsData, kernelWidth);
   init();
 }
 
@@ -86,16 +86,16 @@ shared_ptr<cl::Buffer> CNeuron::convolve(const FeatureMaps inFMaps) {
   return make_shared<cl::Buffer>(convImgBuf);
 }
 
-void CNeuron::setKernel(vector<float*>kernelsData, int kernelWidth) {
+void CNeuron::setKernels(vector<float*>kernelsData, int kernelWidth) {
   CNeuron::kernelWidth  = kernelWidth;
   CNeuron::kernelsData = kernelsData;
   //kernelBuf = cl::Buffer(context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, sizeof(cl_float) * kernelWidth * kernelWidth, (void*)kernelData);
 }
 
 
-PNeuron::PNeuron(float poolCoef, const cl::Context & context, const cl::Device & device, const cl::CommandQueue & commandQueue) :
+PNeuron::PNeuron(float poolBias, const cl::Context & context, const cl::Device & device, const cl::CommandQueue & commandQueue) :
   Neuron(context, device, commandQueue),
-  poolCoef(poolCoef) {
+  poolBias(poolBias){
   init();
 }
 
@@ -134,31 +134,28 @@ int PNeuron::init() {
   return 0;
 }
 
-void PNeuron::pool(const FeatureMaps inFMaps, FeatureMaps *outFMaps)
+shared_ptr<cl::Buffer> PNeuron::pool(const shared_ptr<cl::Buffer> buffer, int outWidth, int outHeight, float poolCoef)
 {
-  int poolImgWidth = int(poolCoef * inFMaps.width);
-  int poolImgHeight = int(poolCoef * inFMaps.height);
-
-  outFMaps->width = poolImgWidth;
-  outFMaps->height = poolImgHeight;
+  int poolImgWidth = outWidth;
+  int poolImgHeight = outHeight;
 
   kernel.setArg(1, sizeof(cl_float), &poolCoef);
+  kernel.setArg(2, sizeof(cl_float), &poolBias);
 
-  for (int j = 0; j < inFMaps.buffers.size(); j++) {
-    cl::Buffer poolImgBuf = cl::Buffer(context, NULL, sizeof(cl_int) * 3 * poolImgWidth * poolImgHeight, NULL);
+  cl::Buffer poolImgBuf = cl::Buffer(context, NULL, sizeof(cl_int) * 3 * poolImgWidth * poolImgHeight, NULL);
 
-    kernel.setArg(0, sizeof(cl_mem), (void*)inFMaps.buffers[j].get());
-    kernel.setArg(2, sizeof(cl_mem), (void*)&poolImgBuf);
+  kernel.setArg(0, sizeof(cl_mem), (void*)buffer.get());
+  kernel.setArg(3, sizeof(cl_mem), (void*)&poolImgBuf);
 
-    commandQueue.enqueueNDRangeKernel(kernel, cl::NDRange(2), cl::NDRange(poolImgWidth, poolImgHeight), cl::NullRange);
-    commandQueue.finish();
+  commandQueue.enqueueNDRangeKernel(kernel, cl::NDRange(2), cl::NDRange(poolImgWidth, poolImgHeight), cl::NullRange);
+  commandQueue.finish();
 
-    outFMaps->buffers.push_back(make_shared<cl::Buffer>(poolImgBuf));
-  }
+  return make_shared<cl::Buffer>(poolImgBuf);
+  //outFMaps->buffers.push_back(make_shared<cl::Buffer>(poolImgBuf));
 }
 
-void PNeuron::setPoolCoef(float poolCoef) {
-  PNeuron::poolCoef = poolCoef;
+void PNeuron::setPoolCoef(float poolBias) {
+  PNeuron::poolBias = poolBias;
 }
 
 
@@ -202,9 +199,15 @@ void CLayer::activate(FeatureMaps prevFeatureMaps) {
 }
 
 
-PLayer::PLayer(shared_ptr<PNeuron> neuron) :
-  neuron(neuron) { }
+PLayer::PLayer(vector<shared_ptr<PNeuron>> neurons, float poolCoef) :
+  neurons(neurons),
+  poolCoef(poolCoef) { }
 
-void PLayer::activate(FeatureMaps prevFeatureMaps) { 
-  neuron.get()->pool(prevFeatureMaps, &featureMaps);
+void PLayer::activate(FeatureMaps prevFeatureMaps) {
+  featureMaps.width = prevFeatureMaps.width*poolCoef;
+  featureMaps.height = prevFeatureMaps.height*poolCoef;
+
+  for (int i = 0; i < neurons.size(); i++) {
+    featureMaps.buffers.push_back(neurons[i].get()->pool(prevFeatureMaps.buffers[i], featureMaps.width, featureMaps.height, poolCoef));
+  }
 }

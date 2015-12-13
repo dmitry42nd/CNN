@@ -47,7 +47,7 @@ void setKernels(int kernelSize, int nKernels, vector<float*>*kernelsData, string
 }
 
 
-void prepareLayer(int nNeurons, int nKernels, int kernelWidth, string filePath, vector<shared_ptr<CNeuron>> *cns) {
+void prepareNeurons(int nNeurons, int nKernels, int kernelWidth, string filePath, vector<shared_ptr<CNeuron>> *cns) {
   printf("%s\n", filePath);
   int kernelSize = kernelWidth*kernelWidth;
   ifstream fin_conv;
@@ -86,7 +86,7 @@ void prepareLayer(int nNeurons, int nKernels, int kernelWidth, string filePath, 
 int main(int argc, char** argv)
 {
   //common stuff >
-  Mat inImage = imread("input.png");
+  Mat inImage = imread("inputM.jpg");
   inImage.convertTo(inImage, CV_32SC3);
 
   if (inImage.empty()) {
@@ -107,56 +107,63 @@ int main(int argc, char** argv)
   commandQueue = cl::CommandQueue(context, device);
   //< common stuff
 
-  //1st layer neuron kernel example
+  //0 conv layer neurons
   int kernelWidth0 = 9;
   vector<shared_ptr<CNeuron>> cns0;
-  prepareLayer(64, 1, 9, "weights_conv1.csv", &cns0);
-  
-#if 1
-  //2nd layer neuron kernel example
+  prepareNeurons(64, 1, 9, "weights_conv1.csv", &cns0);
+
+  //1 conv layer neurons
   int kernelWidth1 = 7; 
   vector<shared_ptr<CNeuron>> cns1;
-  prepareLayer(32, 64, 7, "weights_conv2.csv", &cns1);
+  prepareNeurons(32, 64, 7, "weights_conv2.csv", &cns1);
   
-  //3d layer neuron kernel example (22 layer in matlab code)
+  //2 conv layer neurons (22 layer in matlab code)
   int kernelWidth2 = 1;
   vector<shared_ptr<CNeuron>> cns2;
-  prepareLayer(16, 32, 1, "weights_conv22.csv", &cns2);
+  prepareNeurons(16, 32, 1, "weights_conv22.csv", &cns2);
 
-  //Out layer neuron example
+  //3 (Out) conv layer neurons
   int kernelWidth3 = 5;
   vector<shared_ptr<CNeuron>> cns3;
-  prepareLayer(1, 16, 5, "weights_conv3.csv", &cns3);
-#endif
-  cout << "Layers are ready. Let's run!\n";
+  prepareNeurons(1, 16, 5, "weights_conv3.csv", &cns3);
 
-  //common pool coefficient
-  float poolCoef = 0.5;
+  //0 pool layer neurons
+  float poolCoef0 = 1;
+  float poolBias0 = 0;
+  vector<shared_ptr<PNeuron>> pns0;
+  for (int i = 0; i < 64; i++) {
+    PNeuron pn0(poolBias0, context, device, commandQueue);
+    pns0.push_back(make_shared<PNeuron>(pn0));
+  }
 
-  //Pool Layer stuff
-  PNeuron pn0(poolCoef, context, device, commandQueue);
+  //1 pool layer neurons
+  float poolCoef1 = 1;
+  float poolBias1 = 0;
+  vector<shared_ptr<PNeuron>> pns1;
+  for (int i = 0; i < 32; i++) {
+    PNeuron pn1(poolBias1, context, device, commandQueue);
+    pns1.push_back(make_shared<PNeuron>(pn1));
+  }
 
   //init layers
   shared_ptr<ILayer> iLayer(make_shared<ILayer>());
-
   shared_ptr<CLayer> cLayer0(make_shared<CLayer>(cns0));
-  shared_ptr<PLayer> pLayer0(make_shared<PLayer>(make_shared<PNeuron>(pn0)));
+  shared_ptr<PLayer> pLayer0(make_shared<PLayer>(pns0, poolCoef0));
   shared_ptr<CLayer> cLayer1(make_shared<CLayer>(cns1));
-  shared_ptr<PLayer> pLayer1(make_shared<PLayer>(make_shared<PNeuron>(pn0)));
+  shared_ptr<PLayer> pLayer1(make_shared<PLayer>(pns1, poolCoef1));
   shared_ptr<CLayer> cLayer2(make_shared<CLayer>(cns2));
   //without pool layer
   shared_ptr<CLayer> outLayer(make_shared<CLayer>(cns3));
 
+  cout << "Layers are ready. Let's run!\n";
   //cnn run
   iLayer->activate(inImage, context);
   cLayer0->activate(iLayer->getFeatureMaps());
   pLayer0->activate(cLayer0->getFeatureMaps());
-#if 1
   cLayer1->activate(pLayer0->getFeatureMaps());
   pLayer1->activate(cLayer1->getFeatureMaps());
   cLayer2->activate(pLayer1->getFeatureMaps());
   outLayer->activate(cLayer2->getFeatureMaps());
-#endif
 
   char* x = new char[32];
   

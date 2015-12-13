@@ -1,5 +1,6 @@
 __kernel void Pooling(__global int* inImage,
 	                    float poolCoef,
+                      float poolBias,
 	                    __global int* outImage) {
 
 	int outImgWidth = get_global_size(0), 
@@ -20,6 +21,6 @@ __kernel void Pooling(__global int* inImage,
 		d = inImage[3 * ((m + 1) + inImgWidth * (n + 1)) + ch];
 		fst_max = ((a > b) ? a : b);
 		snd_max = ((c > d) ? c : d);
-		outImage[3 * (i + outImgWidth * j) + ch] = (fst_max > snd_max) ? fst_max : snd_max;
+		outImage[3 * (i + outImgWidth * j) + ch] = ((fst_max > snd_max) ? fst_max : snd_max) + poolBias;
 	}
 }

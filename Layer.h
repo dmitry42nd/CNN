@@ -41,18 +41,18 @@ private:
 
   int init();
 public:
-  CNeuron(vector<float*>kernelData, int kernelWidth, const cl::Context &context, const cl::Device &device, const cl::CommandQueue &commandQueue);
+  CNeuron(vector<float*>kernelsData, int kernelWidth, const cl::Context &context, const cl::Device &device, const cl::CommandQueue &commandQueue);
   CNeuron(const cl::Context &context, const cl::Device &device, const cl::CommandQueue &commandQueue);
 
   shared_ptr<cl::Buffer> convolve(const FeatureMaps inFMaps);
-  void setKernel(vector<float*>kernelsData, int width);
+  void setKernels(vector<float*>kernelsData, int width);
 };
 
 class PNeuron : public Neuron {
 private:
   const string clPoolFileName = "MaxPooling.cl";
 
-  float poolCoef;
+  float poolBias;
 
   cl::Program::Sources source;
   cl::Program          program;
@@ -62,10 +62,12 @@ private:
   int init();
 public:
   PNeuron(const cl::Context &context, const cl::Device &device, const cl::CommandQueue &commandQueue);
-  PNeuron(float poolCoef, const cl::Context &context, const cl::Device &device, const cl::CommandQueue &commandQueue);
+  PNeuron(float poolBias, const cl::Context &context, const cl::Device &device, const cl::CommandQueue &commandQueue);
 
-  void pool(const FeatureMaps inFMaps, FeatureMaps *outFMaps);
-  void setPoolCoef(float poolCoef);
+  //shared_ptr<cl::Buffer> pool(const FeatureMaps inFMaps, FeatureMaps *outFMaps);
+  //shared_ptr<cl::Buffer> pool(const shared_ptr<cl::Buffer> buffer, int inWidth, int inHeight);
+  shared_ptr<cl::Buffer> PNeuron::pool(const shared_ptr<cl::Buffer> buffer, int outWidth, int outHeight, float poolCoef);
+  void setPoolCoef(float bias);
 };
 
 
@@ -109,8 +111,9 @@ public:
 
 class PLayer : public HiddenLayer {
 protected:
-  shared_ptr<PNeuron> neuron;
+  vector<shared_ptr<PNeuron>> neurons;
+  float poolCoef;
 public:
-  PLayer(shared_ptr<PNeuron> neuron);
+  PLayer(vector<shared_ptr<PNeuron>> neurons, float poolCoef);
   void activate(FeatureMaps prevFeatureMaps) override;
 };
