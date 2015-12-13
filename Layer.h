@@ -64,8 +64,6 @@ public:
   PNeuron(const cl::Context &context, const cl::Device &device, const cl::CommandQueue &commandQueue);
   PNeuron(float poolBias, const cl::Context &context, const cl::Device &device, const cl::CommandQueue &commandQueue);
 
-  //shared_ptr<cl::Buffer> pool(const FeatureMaps inFMaps, FeatureMaps *outFMaps);
-  //shared_ptr<cl::Buffer> pool(const shared_ptr<cl::Buffer> buffer, int inWidth, int inHeight);
   shared_ptr<cl::Buffer> PNeuron::pool(const shared_ptr<cl::Buffer> buffer, int outWidth, int outHeight, float poolCoef);
   void setPoolCoef(float bias);
 };

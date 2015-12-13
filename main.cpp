@@ -41,7 +41,7 @@ void prepareCNeurons(int nNeurons, int nKernels, int kernelWidth, string filePat
         for (int k = 0; k < kernelSize; ++k) {
           string str;
           getline(iss, str, ',');
-          weights_conv[k] = stod(str);
+          weights_conv[k] = stof(str);
         }
         kernelsData.push_back(weights_conv);
       }
@@ -68,7 +68,7 @@ void preparePNeurons(int nNeurons, string filePath, vector<shared_ptr<PNeuron>> 
     for (int i = 0; i < nNeurons; ++i) {
       string strBias;
       getline(fin_pool, strBias);
-      float bias = stod(strBias);
+      float bias = stof(strBias);
 
       //create neuron based on bias
       PNeuron pn(bias, context, device, commandQueue);
@@ -85,8 +85,9 @@ void preparePNeurons(int nNeurons, string filePath, vector<shared_ptr<PNeuron>> 
 int main(int argc, char** argv)
 {
   //common stuff >
-  Mat inImage = imread("inputM.jpg");
-  inImage.convertTo(inImage, CV_32SC3);
+  //Mat inImage = imread("inputM.jpg");
+  Mat inImage = imread("input.png");
+  inImage.convertTo(inImage, CV_32FC3);
 
   if (inImage.empty()) {
     cout << "Image is empty" << endl;
@@ -146,13 +147,14 @@ int main(int argc, char** argv)
   //init layers
   shared_ptr<ILayer> iLayer(make_shared<ILayer>());
   shared_ptr<CLayer> cLayer0(make_shared<CLayer>(cns0));
-  shared_ptr<PLayer> pLayer0(make_shared<PLayer>(pns0, 1));
+
+  shared_ptr<PLayer> pLayer0(make_shared<PLayer>(pns0, 1.f));
   shared_ptr<CLayer> cLayer1(make_shared<CLayer>(cns1));
-  shared_ptr<PLayer> pLayer1(make_shared<PLayer>(pns1, 1));
+  shared_ptr<PLayer> pLayer1(make_shared<PLayer>(pns1, 1.f));
   shared_ptr<CLayer> cLayer2(make_shared<CLayer>(cns2));
-  shared_ptr<PLayer> pLayer2(make_shared<PLayer>(pns2, 1));
+  shared_ptr<PLayer> pLayer2(make_shared<PLayer>(pns2, 1.f));
   shared_ptr<CLayer> outCLayer(make_shared<CLayer>(cns3));
-  shared_ptr<PLayer> outPLayer(make_shared<PLayer>(pns3, 1));
+  shared_ptr<PLayer> outPLayer(make_shared<PLayer>(pns3, 1.f));
 
   cout << "Layers are ready. Let's run!\n";
   //cnn run
@@ -161,18 +163,18 @@ int main(int argc, char** argv)
   pLayer0->activate(cLayer0->getFeatureMaps());
   cLayer1->activate(pLayer0->getFeatureMaps());
   pLayer1->activate(cLayer1->getFeatureMaps());
-  cLayer2->activate(pLayer1->getFeatureMaps());
+  /*cLayer2->activate(pLayer1->getFeatureMaps());
   pLayer2->activate(cLayer2->getFeatureMaps());
   outCLayer->activate(pLayer2->getFeatureMaps());
-  outPLayer->activate(outCLayer->getFeatureMaps());
-
+  outPLayer->activate(outCLayer->getFeatureMaps());*/
+  
   char* x = new char[32];
   
-  FeatureMaps out = outPLayer->getFeatureMaps();
+  FeatureMaps out = pLayer1->getFeatureMaps();
   for (size_t i = 0; i < out.buffers.size(); i++) {
     cl::Buffer *o = out.buffers[i].get();
-    Mat image = Mat::zeros(Size(out.width, out.height), CV_32SC3);
-    commandQueue.enqueueReadBuffer(*o, CL_TRUE, 0, sizeof(cl_int) * 3 * out.width * out.height, image.data);
+    Mat image = Mat::zeros(Size(out.width, out.height), CV_32FC3);
+    commandQueue.enqueueReadBuffer(*o, CL_TRUE, 0, sizeof(cl_float) * 3 * out.width * out.height, image.data);
     sprintf(x, "output%d.png", i);
     image.convertTo(image, CV_8UC3);
     imwrite(x, image);

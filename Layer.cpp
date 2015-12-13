@@ -58,8 +58,8 @@ shared_ptr<cl::Buffer> CNeuron::convolve(const FeatureMaps inFMaps) {
   int convImgHeight = inFMaps.height;
 
   //just to init buffer by zeros
-  cl_int *zeros = (cl_int *)calloc(3 * convImgWidth * convImgHeight, sizeof(cl_int));
-  cl::Buffer convImgBuf = cl::Buffer(context, CL_MEM_COPY_HOST_PTR, sizeof(cl_int) * 3 * convImgWidth * convImgHeight, (void *)zeros);
+  cl_float *zeros = (cl_float *)calloc(3 * convImgWidth * convImgHeight, sizeof(cl_float));
+  cl::Buffer convImgBuf = cl::Buffer(context, CL_MEM_COPY_HOST_PTR, sizeof(cl_float) * 3 * convImgWidth * convImgHeight, (void *)zeros);
 
   kernel.setArg(1, sizeof(cl_int), &kernelWidth);
   kernel.setArg(3, sizeof(cl_mem), (void*)&convImgBuf);
@@ -142,7 +142,7 @@ shared_ptr<cl::Buffer> PNeuron::pool(const shared_ptr<cl::Buffer> buffer, int ou
   kernel.setArg(1, sizeof(cl_float), &poolCoef);
   kernel.setArg(2, sizeof(cl_float), &poolBias);
 
-  cl::Buffer poolImgBuf = cl::Buffer(context, NULL, sizeof(cl_int) * 3 * poolImgWidth * poolImgHeight, NULL);
+  cl::Buffer poolImgBuf = cl::Buffer(context, NULL, sizeof(cl_float) * 3 * poolImgWidth * poolImgHeight, NULL);
 
   kernel.setArg(0, sizeof(cl_mem), (void*)buffer.get());
   kernel.setArg(3, sizeof(cl_mem), (void*)&poolImgBuf);
@@ -167,7 +167,7 @@ Layer::Layer() {}
 ILayer::ILayer() {}
 
 void ILayer::activate(Mat inImage, const cl::Context &context) {
-  featureMaps.buffers.push_back(make_shared<cl::Buffer>(cl::Buffer(context, CL_MEM_USE_HOST_PTR, sizeof(cl_int) * 3 * inImage.size().width * inImage.size().height, inImage.data)));
+  featureMaps.buffers.push_back(make_shared<cl::Buffer>(cl::Buffer(context, CL_MEM_USE_HOST_PTR, sizeof(cl_float) * 3 * inImage.size().width * inImage.size().height, inImage.data)));
   featureMaps.width  = inImage.size().width;
   featureMaps.height = inImage.size().height;
 }
@@ -204,8 +204,8 @@ PLayer::PLayer(vector<shared_ptr<PNeuron>> neurons, float poolCoef) :
   poolCoef(poolCoef) { }
 
 void PLayer::activate(FeatureMaps prevFeatureMaps) {
-  featureMaps.width = prevFeatureMaps.width*poolCoef;
-  featureMaps.height = prevFeatureMaps.height*poolCoef;
+  featureMaps.width = static_cast<int>(prevFeatureMaps.width*poolCoef);
+  featureMaps.height = static_cast<int>(prevFeatureMaps.height*poolCoef);
 
   for (size_t i = 0; i < neurons.size(); i++) {
     featureMaps.buffers.push_back(neurons[i].get()->pool(prevFeatureMaps.buffers[i], featureMaps.width, featureMaps.height, poolCoef));
