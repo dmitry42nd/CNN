@@ -29,8 +29,8 @@ class CNeuron : public Neuron {
 private:
   const string clConvFileName = "ConvOperation.cl";
 
-  int        kernelWidth;
-  int        kernelHeight;
+  int            kernelWidth;
+  vector<float*> kernelsData;
 
   cl::Buffer kernelBuf;
 
@@ -41,11 +41,11 @@ private:
 
   int init();
 public:
-  CNeuron(float *kernelData, int kernelWidth, const cl::Context &context, const cl::Device &device, const cl::CommandQueue &commandQueue);
+  CNeuron(vector<float*>kernelData, int kernelWidth, const cl::Context &context, const cl::Device &device, const cl::CommandQueue &commandQueue);
   CNeuron(const cl::Context &context, const cl::Device &device, const cl::CommandQueue &commandQueue);
 
   shared_ptr<cl::Buffer> convolve(const FeatureMaps inFMaps);
-  void setKernel(float *kernel, int width);
+  void setKernel(vector<float*>kernelsData, int width);
 };
 
 class PNeuron : public Neuron {

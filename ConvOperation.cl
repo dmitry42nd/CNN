@@ -4,20 +4,19 @@ int sat(int min, int val, int max) {
 
 __kernel void Convolution(__global int* inImage,
                           int kernelWidth,
-                          int kernelHeight,
                           __global float* kernelData,
                           __global int* outImage,
                           int aggregate) {
   int c = get_global_id(0),
       r = get_global_id(1);
-  int cs = c - kernelHeight / 2,
+  int cs = c - kernelWidth / 2,
       rs = r - kernelWidth / 2;
 
   int imgWidth  = get_global_size(0),
       imgHeight = get_global_size(1);
 
   int pix[3] = {0, 0, 0};
-  for (int m = 0; m < kernelHeight; m++) {
+  for (int m = 0; m < kernelWidth; m++) {
     for (int n = 0; n < kernelWidth; n++) {
       for (int ch = 0; ch < 3; ch++) {
         pix[ch] += inImage[3 * (sat(0, rs + m, imgHeight-1) * imgWidth + 
@@ -32,7 +31,7 @@ __kernel void Convolution(__global int* inImage,
 
   if (aggregate) {
     float normDiv = 0;
-    for (int i = 0; i < kernelHeight*kernelWidth; i++) {
+    for (int i = 0; i < kernelWidth*kernelWidth; i++) {
       normDiv += kernelData[i];
     }
     float finalDiv = normDiv*aggregate;

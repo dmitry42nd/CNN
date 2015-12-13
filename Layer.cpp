@@ -10,10 +10,9 @@ Neuron::Neuron(const cl::Context & context, const cl::Device & device, const cl:
 }
 
 
-CNeuron::CNeuron(float *kernelData, int kernelWidth, const cl::Context &context, const cl::Device &device, const cl::CommandQueue &commandQueue) : 
+CNeuron::CNeuron(vector<float*>kernelData, int kernelWidth, const cl::Context &context, const cl::Device &device, const cl::CommandQueue &commandQueue) : 
   Neuron(context, device, commandQueue),
-  kernelWidth(kernelWidth),
-  kernelHeight(kernelWidth) {
+  kernelWidth(kernelWidth) {
   setKernel(kernelData, kernelWidth);
   init();
 }
@@ -53,6 +52,7 @@ int CNeuron::init() {
 }
 
 shared_ptr<cl::Buffer> CNeuron::convolve(const FeatureMaps inFMaps) {
+  printf("%d %d\n", inFMaps.buffers.size(), kernelsData.size());
   int aggregate = 0;
   int convImgWidth  = inFMaps.width;
   int convImgHeight = inFMaps.height;
@@ -62,21 +62,23 @@ shared_ptr<cl::Buffer> CNeuron::convolve(const FeatureMaps inFMaps) {
   cl::Buffer convImgBuf = cl::Buffer(context, CL_MEM_COPY_HOST_PTR, sizeof(cl_int) * 3 * convImgWidth * convImgHeight, (void *)zeros);
 
   kernel.setArg(1, sizeof(cl_int), &kernelWidth);
-  kernel.setArg(2, sizeof(cl_int), &kernelHeight);
-  kernel.setArg(3, sizeof(cl_mem), (void*)&kernelBuf);
-  kernel.setArg(4, sizeof(cl_mem), (void*)&convImgBuf);
-  kernel.setArg(5, sizeof(cl_int), &aggregate);
+  kernel.setArg(3, sizeof(cl_mem), (void*)&convImgBuf);
+  kernel.setArg(4, sizeof(cl_int), &aggregate);
   
-  for (int j = 0; j < inFMaps.buffers.size()-1; j++) {
+  for (int j = 0; j < inFMaps.buffers.size() - 1; j++) {
+    kernelBuf = cl::Buffer(context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, sizeof(cl_float) * kernelWidth * kernelWidth, (void*)kernelsData[j]);
     kernel.setArg(0, sizeof(cl_mem), (void*)inFMaps.buffers[j].get());
+    kernel.setArg(2, sizeof(cl_mem), (void*)&kernelBuf);
     commandQueue.enqueueNDRangeKernel(kernel, cl::NDRange(2), cl::NDRange(convImgWidth, convImgHeight), cl::NullRange);
     commandQueue.finish();
   }
 
   //final aggregate level
   aggregate = inFMaps.buffers.size();
+  kernelBuf = cl::Buffer(context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, sizeof(cl_float) * kernelWidth * kernelWidth, (void*)kernelsData[kernelsData.size() - 1]);
   kernel.setArg(0, sizeof(cl_mem), (void*)inFMaps.buffers[inFMaps.buffers.size() - 1].get());
-  kernel.setArg(5, sizeof(cl_int), &aggregate);
+  kernel.setArg(2, sizeof(cl_mem), (void*)&kernelBuf);
+  kernel.setArg(4, sizeof(cl_int), &aggregate);
   commandQueue.enqueueNDRangeKernel(kernel, cl::NDRange(2), cl::NDRange(convImgWidth, convImgHeight), cl::NullRange);
   commandQueue.finish();
 
@@ -84,10 +86,10 @@ shared_ptr<cl::Buffer> CNeuron::convolve(const FeatureMaps inFMaps) {
   return make_shared<cl::Buffer>(convImgBuf);
 }
 
-void CNeuron::setKernel(float *kernelData, int kernelWidth) {
+void CNeuron::setKernel(vector<float*>kernelsData, int kernelWidth) {
   CNeuron::kernelWidth  = kernelWidth;
-  CNeuron::kernelHeight = kernelWidth;
-  kernelBuf = cl::Buffer(context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, sizeof(cl_float) * kernelWidth * kernelHeight, (void*)kernelData);
+  CNeuron::kernelsData = kernelsData;
+  //kernelBuf = cl::Buffer(context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, sizeof(cl_float) * kernelWidth * kernelWidth, (void*)kernelData);
 }
 
 

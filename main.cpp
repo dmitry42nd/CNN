@@ -23,6 +23,23 @@ cl::Device device;
 cl::Context context;
 cl::CommandQueue commandQueue;
 
+void setKernels(int kernelWidth, int kernelHeight, int l, vector<float*>*kernelsData) {
+
+  for (int k = 0; k < l; k++) {
+    //form kernelData
+    float* kernelData0 = new float[kernelWidth * kernelHeight];
+    for (int i = 0; i < kernelWidth; ++i) {
+      for (int j = 0; j < kernelHeight; ++j)
+        kernelData0[i + kernelWidth * j] = 0.f;
+    }
+    int tmp = kernelWidth / 2;
+    kernelData0[tmp + kernelWidth * tmp] = 1.f;
+
+    //add to kernels
+    kernelsData->push_back(kernelData0);
+  }
+}
+
 int main(int argc, char** argv)
 {
   //common stuff >
@@ -48,54 +65,39 @@ int main(int argc, char** argv)
   //< common stuff
 
   //1st layer neuron kernel example
-  int kernelWidth0 = 9; 
+  int kernelWidth0 = 9;
   int kernelHeight0 = 9;
-  float* kernelData0 = new float[kernelWidth0 * kernelHeight0];
 
-  for (int i = 0; i < kernelWidth0; ++i) {
-    for (int j = 0; j < kernelHeight0; ++j)
-      kernelData0[i + kernelWidth0 * j] = 0.f;
-  }
-  kernelData0[4 + kernelWidth0 * 4] = 1.f;
-  
+  vector<float*>kernelsData0;
+  setKernels(kernelWidth0, kernelHeight0, 1, &kernelsData0);
+    
   //2nd layer neuron kernel example
   int kernelWidth1 = 7; 
   int kernelHeight1 = 7;
-  float *kernelData1 = new float[kernelWidth1 * kernelHeight1];
 
-  for (int i = 0; i < kernelWidth1; ++i) {
-    for (int j = 0; j < kernelHeight1; ++j)
-      if(i==0 || j==0 || i== kernelWidth1-1 || j== kernelHeight1-1)
-        kernelData1[i + kernelWidth1 * j] = 0.8f;
-      else if (i == 1 || j == 1 || i == kernelWidth1 - 2 || j == kernelHeight1 - 2)
-        kernelData1[i + kernelWidth1 * j] = 0.4f;
-      else
-        kernelData1[i + kernelWidth1 * j] = 0.2f;
-  }
-  kernelData1[3 + kernelWidth1 * 3] = -5.f;
-
+  vector<float*>kernelsData1;
+  setKernels(kernelWidth1, kernelHeight1, 8, &kernelsData1); //64
+  
   //3d layer neuron kernel example (22 layer in matlab code)
   int kernelWidth2 = 1;
   int kernelHeight2 = 1;
-  float *kernelData2 = new float[kernelWidth2 * kernelHeight2];
-  kernelData2[0] = 1.f;
+
+  vector<float*>kernelsData2;
+  setKernels(kernelWidth2, kernelHeight2, 4, &kernelsData2); //32
 
   //Out layer neuron example
   int kernelWidth3 = 5;
   int kernelHeight3 = 5;
-  float *kernelData3 = new float[kernelWidth3 * kernelHeight3];
 
-  for (int i = 0; i < kernelWidth3; ++i) {
-    for (int j = 0; j < kernelHeight3; ++j)
-      kernelData3[i + kernelWidth3 * j] = 0.2f;
-  }
+  vector<float*>kernelsData3;
+  setKernels(kernelWidth3, kernelHeight3, 2, &kernelsData3); //32
 
   //common pool coefficient
   float poolCoef = 0.5;
 
 //Convolution Layers stuff
   //create neuron based on kernel data
-  CNeuron cn0(kernelData0, kernelWidth0, context, device, commandQueue);
+  CNeuron cn0(kernelsData0, kernelWidth0, context, device, commandQueue);
 
   //create vector of neurons for conv layer1
   vector<shared_ptr<CNeuron>> cns0;
@@ -103,7 +105,7 @@ int main(int argc, char** argv)
   for (int i = 0; i < l1; i ++)
     cns0.push_back(make_shared<CNeuron>(cn0));
 
-  CNeuron cn1(kernelData1, kernelWidth1, context, device, commandQueue);
+  CNeuron cn1(kernelsData1, kernelWidth1, context, device, commandQueue);
   //create vector of neurons for conv layer2
   vector<shared_ptr<CNeuron>> cns1;
   int l2 = 4; //32
@@ -111,14 +113,14 @@ int main(int argc, char** argv)
     cns1.push_back(make_shared<CNeuron>(cn1));
 
   //create vector of neurons for conv layer3
-  CNeuron cn2(kernelData2, kernelWidth2, context, device, commandQueue);
+  CNeuron cn2(kernelsData2, kernelWidth2, context, device, commandQueue);
   vector<shared_ptr<CNeuron>> cns2;
   int l3 = 2; //16
   for (int i = 0; i < l3; i++)
     cns2.push_back(make_shared<CNeuron>(cn2));
 
   //create vector of neurons for out layer
-  CNeuron cn3(kernelData3, kernelWidth3, context, device, commandQueue);
+  CNeuron cn3(kernelsData3, kernelWidth3, context, device, commandQueue);
   vector<shared_ptr<CNeuron>> cns3;
   cns3.push_back(make_shared<CNeuron>(cn3));
 
@@ -161,8 +163,6 @@ int main(int argc, char** argv)
   }
   
   delete[] x;
-  delete[] kernelData0;
-  delete[] kernelData1;
 
   cout << "done!\n";
   return 0;
