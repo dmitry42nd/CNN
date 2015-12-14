@@ -13,7 +13,6 @@
 using namespace std;
 using namespace cv;
 
-
 int platformId = 0, deviceId = 0;
 
 vector<cl::Platform> setPlatforms;
@@ -27,7 +26,6 @@ void prepareCNeurons(int nNeurons, int nKernels, int kernelWidth, string filePat
   int kernelSize = kernelWidth*kernelWidth;
   ifstream fin_conv;
   fin_conv.exceptions(ifstream::failbit | ifstream::badbit);
-
   try {
     fin_conv.open(filePath);
     for (int i = 0; i < nNeurons; ++i) {
@@ -68,7 +66,7 @@ void preparePNeurons(int nNeurons, string filePath, vector<shared_ptr<PNeuron>> 
     for (int i = 0; i < nNeurons; ++i) {
       string strBias;
       getline(fin_pool, strBias);
-      float bias = stof(strBias);
+      float bias = stof(strBias)*255.;
 
       //create neuron based on bias
       PNeuron pn(bias, context, device, commandQueue);
@@ -86,13 +84,12 @@ int main(int argc, char** argv)
 {
   //common stuff >
   Mat inImage = imread("inputM.jpg");
-  //Mat inImage = imread("input.png");
-  inImage.convertTo(inImage, CV_32FC3);
-
   if (inImage.empty()) {
     cout << "Image is empty" << endl;
     return 1;
   }
+  
+  inImage.convertTo(inImage, CV_32FC3);
   int inImgWidth = inImage.size().width;
   int inImgHeight = inImage.size().height;
 
@@ -107,6 +104,7 @@ int main(int argc, char** argv)
   commandQueue = cl::CommandQueue(context, device);
   //< common stuff
 
+  cout << "CNN layers are preparing...\n";
   //0 conv layer neurons
   int kernelWidth0 = 9;
   vector<shared_ptr<CNeuron>> cns0;
@@ -141,13 +139,12 @@ int main(int argc, char** argv)
 
   //3 pool layer neurons
   vector<shared_ptr<PNeuron>> pns3;
-  preparePNeurons(1, "biases_conv22.csv", &pns3);
+  preparePNeurons(1, "biases_conv3.csv", &pns3);
 
 
   //init layers
   shared_ptr<ILayer> iLayer(make_shared<ILayer>());
   shared_ptr<CLayer> cLayer0(make_shared<CLayer>(cns0));
-
   shared_ptr<PLayer> pLayer0(make_shared<PLayer>(pns0, 1.f));
   shared_ptr<CLayer> cLayer1(make_shared<CLayer>(cns1));
   shared_ptr<PLayer> pLayer1(make_shared<PLayer>(pns1, 1.f));
@@ -161,13 +158,14 @@ int main(int argc, char** argv)
   iLayer->activate(inImage, context);
   cLayer0->activate(iLayer->getFeatureMaps());
   pLayer0->activate(cLayer0->getFeatureMaps());
+  
   cLayer1->activate(pLayer0->getFeatureMaps());
   pLayer1->activate(cLayer1->getFeatureMaps());
   cLayer2->activate(pLayer1->getFeatureMaps());
   pLayer2->activate(cLayer2->getFeatureMaps());
   outCLayer->activate(pLayer2->getFeatureMaps());
   outPLayer->activate(outCLayer->getFeatureMaps());
-  
+
   char* x = new char[32];
   
   FeatureMaps out = outPLayer->getFeatureMaps();
@@ -182,6 +180,6 @@ int main(int argc, char** argv)
   
   delete[] x;
 
-  cout << "done!\n";
+  cout << "Done!\n";
   return 0;
 }

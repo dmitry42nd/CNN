@@ -52,8 +52,6 @@ int CNeuron::init() {
 }
 
 shared_ptr<cl::Buffer> CNeuron::convolve(const FeatureMaps inFMaps) {
-  //printf("%d %d\n", inFMaps.buffers.size(), kernelsData.size());
-  int aggregate = 0;
   int convImgWidth  = inFMaps.width;
   int convImgHeight = inFMaps.height;
 
@@ -63,24 +61,14 @@ shared_ptr<cl::Buffer> CNeuron::convolve(const FeatureMaps inFMaps) {
 
   kernel.setArg(1, sizeof(cl_int), &kernelWidth);
   kernel.setArg(3, sizeof(cl_mem), (void*)&convImgBuf);
-  kernel.setArg(4, sizeof(cl_int), &aggregate);
   
-  for (size_t j = 0; j < inFMaps.buffers.size() - 1; j++) {
+  for (size_t j = 0; j < inFMaps.buffers.size(); j++) {
     kernelBuf = cl::Buffer(context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, sizeof(cl_float) * kernelWidth * kernelWidth, (void*)kernelsData[j]);
     kernel.setArg(0, sizeof(cl_mem), (void*)inFMaps.buffers[j].get());
     kernel.setArg(2, sizeof(cl_mem), (void*)&kernelBuf);
     commandQueue.enqueueNDRangeKernel(kernel, cl::NDRange(2), cl::NDRange(convImgWidth, convImgHeight), cl::NullRange);
     commandQueue.finish();
   }
-
-  //final aggregate level
-  aggregate = inFMaps.buffers.size();
-  kernelBuf = cl::Buffer(context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, sizeof(cl_float) * kernelWidth * kernelWidth, (void*)kernelsData[kernelsData.size() - 1]);
-  kernel.setArg(0, sizeof(cl_mem), (void*)inFMaps.buffers[inFMaps.buffers.size() - 1].get());
-  kernel.setArg(2, sizeof(cl_mem), (void*)&kernelBuf);
-  kernel.setArg(4, sizeof(cl_int), &aggregate);
-  commandQueue.enqueueNDRangeKernel(kernel, cl::NDRange(2), cl::NDRange(convImgWidth, convImgHeight), cl::NullRange);
-  commandQueue.finish();
 
   free(zeros);
   return make_shared<cl::Buffer>(convImgBuf);
@@ -89,7 +77,6 @@ shared_ptr<cl::Buffer> CNeuron::convolve(const FeatureMaps inFMaps) {
 void CNeuron::setKernels(vector<float*>kernelsData, int kernelWidth) {
   CNeuron::kernelWidth  = kernelWidth;
   CNeuron::kernelsData = kernelsData;
-  //kernelBuf = cl::Buffer(context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, sizeof(cl_float) * kernelWidth * kernelWidth, (void*)kernelData);
 }
 
 
@@ -151,7 +138,6 @@ shared_ptr<cl::Buffer> PNeuron::pool(const shared_ptr<cl::Buffer> buffer, int ou
   commandQueue.finish();
 
   return make_shared<cl::Buffer>(poolImgBuf);
-  //outFMaps->buffers.push_back(make_shared<cl::Buffer>(poolImgBuf));
 }
 
 void PNeuron::setPoolCoef(float poolBias) {
