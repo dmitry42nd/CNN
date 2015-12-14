@@ -83,7 +83,7 @@ void preparePNeurons(int nNeurons, string filePath, vector<shared_ptr<PNeuron>> 
 int main(int argc, char** argv)
 {
   //common stuff >
-  Mat inImage = imread("inputM.jpg");
+  Mat inImage = imread("data/input.jpg");
   if (inImage.empty()) {
     cout << "Image is empty" << endl;
     return 1;
@@ -108,38 +108,38 @@ int main(int argc, char** argv)
   //0 conv layer neurons
   int kernelWidth0 = 9;
   vector<shared_ptr<CNeuron>> cns0;
-  prepareCNeurons(64, 1, 9, "weights_conv1.csv", &cns0);
+  prepareCNeurons(64, 1, 9, "data/weights_conv1.csv", &cns0);
 
   //1 conv layer neurons
   int kernelWidth1 = 7; 
   vector<shared_ptr<CNeuron>> cns1;
-  prepareCNeurons(32, 64, 7, "weights_conv2.csv", &cns1);
+  prepareCNeurons(32, 64, 7, "data/weights_conv2.csv", &cns1);
   
   //2 conv layer neurons (22 layer in matlab code)
   int kernelWidth2 = 1;
   vector<shared_ptr<CNeuron>> cns2;
-  prepareCNeurons(16, 32, 1, "weights_conv22.csv", &cns2);
+  prepareCNeurons(16, 32, 1, "data/weights_conv22.csv", &cns2);
 
   //3 (Out) conv layer neurons
   int kernelWidth3 = 5;
   vector<shared_ptr<CNeuron>> cns3;
-  prepareCNeurons(1, 16, 5, "weights_conv3.csv", &cns3);
+  prepareCNeurons(1, 16, 5, "data/weights_conv3.csv", &cns3);
 
   //0 pool layer neurons
   vector<shared_ptr<PNeuron>> pns0;
-  preparePNeurons(64, "biases_conv1.csv", &pns0);
+  preparePNeurons(64, "data/biases_conv1.csv", &pns0);
   
   //1 pool layer neurons
   vector<shared_ptr<PNeuron>> pns1;
-  preparePNeurons(32, "biases_conv2.csv", &pns1);
+  preparePNeurons(32, "data/biases_conv2.csv", &pns1);
 
   //2 pool layer neurons
   vector<shared_ptr<PNeuron>> pns2;
-  preparePNeurons(16, "biases_conv22.csv", &pns2);
+  preparePNeurons(16, "data/biases_conv22.csv", &pns2);
 
   //3 pool layer neurons
   vector<shared_ptr<PNeuron>> pns3;
-  preparePNeurons(1, "biases_conv3.csv", &pns3);
+  preparePNeurons(1, "data/biases_conv3.csv", &pns3);
 
 
   //init layers
