@@ -85,8 +85,8 @@ void preparePNeurons(int nNeurons, string filePath, vector<shared_ptr<PNeuron>> 
 int main(int argc, char** argv)
 {
   //common stuff >
-  //Mat inImage = imread("inputM.jpg");
-  Mat inImage = imread("input.png");
+  Mat inImage = imread("inputM.jpg");
+  //Mat inImage = imread("input.png");
   inImage.convertTo(inImage, CV_32FC3);
 
   if (inImage.empty()) {
@@ -163,14 +163,14 @@ int main(int argc, char** argv)
   pLayer0->activate(cLayer0->getFeatureMaps());
   cLayer1->activate(pLayer0->getFeatureMaps());
   pLayer1->activate(cLayer1->getFeatureMaps());
-  /*cLayer2->activate(pLayer1->getFeatureMaps());
+  cLayer2->activate(pLayer1->getFeatureMaps());
   pLayer2->activate(cLayer2->getFeatureMaps());
   outCLayer->activate(pLayer2->getFeatureMaps());
-  outPLayer->activate(outCLayer->getFeatureMaps());*/
+  outPLayer->activate(outCLayer->getFeatureMaps());
   
   char* x = new char[32];
   
-  FeatureMaps out = pLayer1->getFeatureMaps();
+  FeatureMaps out = outPLayer->getFeatureMaps();
   for (size_t i = 0; i < out.buffers.size(); i++) {
     cl::Buffer *o = out.buffers[i].get();
     Mat image = Mat::zeros(Size(out.width, out.height), CV_32FC3);

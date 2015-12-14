@@ -25,18 +25,19 @@ __kernel void Convolution(__global float* inImage,
     }
   }
 
-  float normDiv = 0;
+  /*float normDiv = 0;
   for (int i = 0; i < kernelWidth*kernelWidth; i++) {
     normDiv += kernelData[i];
-  }
-
-  outImage[3 * (r*imgWidth + c) + 0] += pix[0] / normDiv;
-  outImage[3 * (r*imgWidth + c) + 1] += pix[1] / normDiv;
-  outImage[3 * (r*imgWidth + c) + 2] += pix[2] / normDiv;
-
+  }*/
+  
+  outImage[3 * (r*imgWidth + c) + 0] += pix[0];
+  outImage[3 * (r*imgWidth + c) + 1] += pix[1];
+  outImage[3 * (r*imgWidth + c) + 2] += pix[2];
+  /*
   if(aggregate) {
     outImage[3 * (r*imgWidth + c) + 0] /= aggregate;
     outImage[3 * (r*imgWidth + c) + 1] /= aggregate;
     outImage[3 * (r*imgWidth + c) + 2] /= aggregate;
   }
+  */
 }
